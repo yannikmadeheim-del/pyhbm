@@ -385,4 +385,150 @@ class FrequencyDomainFirstOrderODE_Complex(FrequencyDomainFirstOrderODE):
         
         return block([[J_RR, J_RI], [J_IR, J_II]])
 
+
+# %%
+
+class FrequencyDomainSecondOrderODE(object):
+    def __init__(self, second_order_ode: SecondOrderODE) -> None:
+        self.ode = second_order_ode
+        self.complex_dimension = Fourier.number_of_harmonics * self.ode.dimension
+        self.real_dimension = self.complex_dimension * 2
+
+        self.external_term = self.compute_external_force()
+        self.jacobian_linear_term = self.compute_jacobian_linear_term()
+
+        self.jacobian_adimensional_time_derivative_term = kron(diag(Fourier.harmonics), eye(self.ode.dimension))
+
+    # Residue in Real-Imaginary Format
+    def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
+        ome = x.omega
+        n = Fourier.harmonics
+        nonlinear_term = self.compute_nonlinear_term(state)
+        linear_term_coefficients = (self.ode.stiffness_matrix @ state.coefficients                                                    # f_lin = (-(omega*n)**2*M + j*(omega*n)*C + K) @ Q for every harmonic n
+                + einsum('i,ijk->ijk', -n ** 2 * ome ** 2, self.ode.mass_matrix @ state.coefficients)
+                + einsum('i,ijk->ijk', 1j * n * ome, self.ode.damping_matrix @ state.coefficients))
+        residue_coefficients = linear_term_coefficients + nonlinear_term.coefficients - self.external_term.coefficients  # complex array
+        return Fourier.coefficients_to_RI(residue_coefficients)  # real array
+
+    # Derivative of Residue with respect to omega in Real-Imaginary Format
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
+        ome = x.omega
+        n = Fourier.harmonics
+        derivative_wrt_omega = (einsum('i,ijk->ijk', -2*ome*n**2, self.ode.mass_matrix @ state.coefficients)
+                + einsum('i,ijk->ijk', 1j*n, self.ode.damping_matrix @ state.coefficients))
+        R = vstack(derivative_wrt_omega.real)
+        I = vstack(derivative_wrt_omega.imag)
+        return vstack((R, I))
+
+    """
+    # The following methods must be specified separately for real-valued and complex-valued systems.
+    """
+
+    def compute_jacobian_linear_term(self) -> JacobianFourier:
+        pass
+
+    def compute_external_force(self) -> Fourier:
+        pass
+
+    def compute_nonlinear_term(self, state: Fourier) -> Fourier:
+        pass
+
+    def compute_jacobian_nonlinear_term(self, state: Fourier) -> JacobianFourier:
+        pass
+
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        pass
+
+
+class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
+    """
+    # The following methods are for systems where the external force and nonlinear terms are real-valued
+    # and the Fourier coefficients are computed using the Real FFT (rFFT).
+    """
+
+    # Linear Jacobian for Real-Valued Systems
+    def compute_jacobian_linear_term(self, omega: float) -> JacobianFourier_Real:
+        state =  - omega ** 2 * kron(diag(Fourier.harmonics ** 2), self.ode.mass_matrix) \
+                 + 1j * omega * kron(diag(Fourier.harmonics), self.ode.damping_matrix) \
+                 + kron(eye(Fourier.number_of_harmonics), self.ode.stiffness_matrix)
+
+        state_conj = kron(where(JacobianFourier.harmonics_state_conj == 0, 1, 0), -omega**2*self.ode.mass_matrix + 1j*omega*self.ode.damping_matrix + self.ode.stiffness_matrix)
+
+        RR = (state + state_conj).real
+        II = (state - state_conj).real
+        RI = -(state + state_conj).imag
+        IR = (state - state_conj).imag
+        return JacobianFourier_Real(RR=RR, RI=RI, IR=IR, II=II)
+
+    # External Force for Real-Valued Systems
+    def compute_external_force(self) -> Fourier_Real:
+        external_term_time_series = self.ode.external_term(Fourier.adimensional_time_samples)
+        return Fourier_Real.new_from_time_series(external_term_time_series)
+
+    # Nonlinear Term for Real-Valued Systems
+    def compute_nonlinear_term(self, state: Fourier_Real) -> Fourier_Real:
+        Fourier_Real.compute_time_series(state)
+        fnl_time_series = self.ode.nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
+        return Fourier_Real.new_from_time_series(fnl_time_series)
+
+    def compute_jacobian_nonlinear_term(self, state: Fourier_Real) -> JacobianFourier_Real:
+        dfnldq_time_series = self.ode.jacobian_nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
+        return JacobianFourier_Real.new_from_time_series(dfnldq_time_series)
+
+    # Jacobian of Residue for Real-Valued Systems in Real-Imaginary Format
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        jacobian_nonlinear_term = self.compute_jacobian_nonlinear_term(x.fourier)
+        aux = self.jacobian_adimensional_time_derivative_term * x.omega
+
+        J_RR = jacobian_nonlinear_term.RR + self.jacobian_linear_term.RR
+        J_RI = jacobian_nonlinear_term.RI + aux
+        J_IR = jacobian_nonlinear_term.IR - aux
+        J_II = jacobian_nonlinear_term.II + self.jacobian_linear_term.II
+
+        return block([[J_RR, J_RI], [J_IR, J_II]])
+
+
+class FrequencyDomainFirstOrderODE_Complex(FrequencyDomainFirstOrderODE):
+    """
+    # The following methods are for systems where the external force and nonlinear terms are complex-valued
+    # and the Fourier coefficients are computed using the FFT (FFT).
+    """
+
+    # Linear Jacobian for Complex-Valued Systems
+    def compute_jacobian_linear_term(self) -> JacobianFourier_Complex:
+        linear = kron(eye(Fourier.number_of_harmonics), self.ode.linear_coefficient)
+        # IR = -RI = linear.imag
+        # II = RR = linear.real
+        return JacobianFourier_Complex(RR=linear.real, RI=-linear.imag, IR=None, II=None)
+
+    # External Force for Complex-Valued Systems
+    def compute_external_force(self) -> Fourier_Complex:
+        external_term_time_series = self.ode.external_term(Fourier.adimensional_time_samples)
+        return Fourier_Complex.new_from_time_series(external_term_time_series)
+
+    # Nonlinear Term for Complex-Valued Systems
+    def compute_nonlinear_term(self, state: Fourier_Complex) -> Fourier_Complex:
+        Fourier_Complex.compute_time_series(state)
+        fnl_time_series = self.ode.nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
+        return Fourier_Complex.new_from_time_series(fnl_time_series)
+
+    # Jacobian of Nonlinear Term for Complex-Valued Systems
+    def compute_jacobian_nonlinear_term(self, state: Fourier_Complex) -> JacobianFourier_Complex:
+        dfnldq_time_series = self.ode.jacobian_nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
+        return JacobianFourier_Complex.new_from_time_series(dfnldq_time_series)
+
+    # Jacobian of Residue for Complex-Valued Systems in Real-Imaginary Format
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        jacobian_nonlinear_term = self.compute_jacobian_nonlinear_term(x.fourier)
+        aux = self.jacobian_linear_term.RI + self.jacobian_adimensional_time_derivative_term * x.omega
+
+        J_RR = jacobian_nonlinear_term.RR + self.jacobian_linear_term.RR
+        J_RI = jacobian_nonlinear_term.RI + aux
+        J_IR = jacobian_nonlinear_term.IR - aux
+        J_II = jacobian_nonlinear_term.II + self.jacobian_linear_term.RR
+
+        return block([[J_RR, J_RI], [J_IR, J_II]])
+
 # %% Test

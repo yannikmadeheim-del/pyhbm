@@ -146,3 +146,124 @@ class DuffingForced(FirstOrderODE):
 			jacobian_P = array([[np.zeros_like(adimensional_time), cos(adimensional_time)]]).transpose()
 		
 		return jacobian_c, jacobian_k, jacobian_beta, jacobian_P
+
+
+# %%
+class DuffingForced_SecondOrder(SecondOrderODE):
+	"""
+	Class that implements the dynamics
+
+	q'' + c*q' + k*q + beta*(q**3) = P*cos(tau)
+
+	where:
+	- q is the displacement (' = d/dt)
+	- k is the stiffness coefficient per unit mass [T^-2]
+	- c is the damping coefficient per unit mass [T^-1]
+	- beta is the nonlinearity coefficient per unit mass [L^-2 T^-2]
+	- P is the amplitude of the external force per unit mass [L T^-2]
+	- tau is the adimensional time, defined as tau = omega * t
+	- omega is the frequency of the external force
+	- t is the physical time
+	"""
+
+	def __init__(self, c=0.009, k=1.0, beta=0.1, P=1.0):
+		"""
+		Initializes the Duffing oscillator parameters.
+
+		:param c: Damping coefficient per unit mass [T^-1]
+		:param k: Stiffness coefficient per unit mass [T^-2]
+		:param beta: Nonlinearity coefficient per unit mass [L^-2 T^-2]
+		:param P: Amplitude of the external force per unit mass [L T^-2]
+		"""
+		self.c = c
+		self.k = k
+		self.omega_resonance_linear = np.sqrt(k)
+		self.beta = beta
+		self.P = P  # also serves as reference force level
+		self.mass_matrix = np.eye(1)
+		self.damping_matrix = np.array([c])
+		self.stiffness_matrix = np.array([k])
+		self.dimension = 1  		# 1 dimensional in second order and 2 dimensional in first order
+		self.polynomial_degree = 3
+
+	def external_term(self, adimensional_time: np.ndarray) -> np.ndarray:
+		"""
+		Calculates the external forcing term.
+
+		:param adimensional_time: Time at which to evaluate the external force
+		:return: External force array
+		"""
+		force_ext = self.P * cos(adimensional_time)
+		return array([force_ext]).transpose()
+
+	def nonlinear_term(self, q: np.ndarray) -> np.ndarray:
+		"""
+		Calculates the nonlinear term.
+
+		:param q: desplacement vector
+		:return: Nonlinear term array
+		"""
+		fnl = -self.beta * np.power(q, 3)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]
+		return fnl
+
+	def all_terms(self, q: np.ndarray, q_dot: np.ndarray, adimensional_time: np.ndarray) -> np.ndarray:
+		"""
+		Combines all terms (linear, nonlinear, external) to compute the total force.
+
+		:param state: State vector
+		:param adimensional_time: Time for evaluating external force
+		:return: Total force array
+		"""
+		return (
+			- self.stiffness_matrix @ q
+			- self.damping_matrix @ q_dot
+			+ self.nonlinear_term(q)
+			+ self.external_term(adimensional_time)
+		)
+
+	def jacobian_nonlinear_term(self, q: np.ndarray, adimensional_time: np.ndarray) -> np.ndarray:
+		"""
+		Computes the Jacobian of the nonlinear term.
+
+		:param q: Displacement vector
+		:return: Jacobian of the nonlinear term
+		"""
+		dfnldq = -3 * self.beta * np.power(q,2)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]  # Correct coefficient for cubic nonlinearity
+		return dfnldq
+
+	def jacobian_parameters(self,
+	                        q: np.ndarray,
+	                        q_dot: np.ndarray,
+	                        adimensional_time: np.ndarray,
+	                        output_c=False,
+	                        output_k=False,
+	                        output_beta=False,
+	                        output_P=False) -> np.ndarray:
+		"""
+		Computes the Jacobian w.r.t the parameters c, k, beta and P.
+
+		:param q: displacement vector
+		:param q_dot: velocity vector
+		:param adimensional_time: Time for evaluating external force
+		:param output_c: Boolean to decide whether to compute and output the jacobian w.r.t c
+		:param output_k: Boolean to decide whether to compute and output the jacobian w.r.t k
+		:param output_beta: Boolean to decide whether to compute and output the jacobian w.r.t beta
+		:param output_P: Boolean to decide whether to compute and output the jacobian w.r.t P
+		:return: Jacobian w.r.t the parameters
+		"""
+		jacobian_c, jacobian_k, jacobian_beta, jacobian_P = None, None, None, None
+
+
+		if output_c:
+			jacobian_c = -q_dot
+
+		if output_k:
+			jacobian_k = -q
+
+		if output_beta:
+			jacobian_beta = -np.power(q, 3)
+
+		if output_P:
+			jacobian_P = array([cos(adimensional_time)]).transpose()
+
+		return jacobian_c, jacobian_k, jacobian_beta, jacobian_P

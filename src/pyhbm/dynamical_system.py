@@ -87,3 +87,32 @@ class FirstOrderODE:
         :return: Jacobian array of shape (dimension, dimension)
         """
         return self.linear_coefficient + self.jacobian_nonlinear_term(state, adimensional_time)
+
+class SecondOrderODE:
+    """
+    Base class for 2nd-order mechanical systems:
+        M*q'' + C*q' + K*q + fnl(q, q', tau) = fext(tau)
+    in adimensional time tau = omega*t, where ' = d/dt.
+
+    Subclasses must implement:
+        - external_term(adimensional_time)
+        - nonlinear_term(q, adimensional_time)
+        - jacobian_nonlinear_term(q, adimensional_time)
+    """
+    is_real_valued: bool = True
+
+    def __init__(self):
+        self.mass_matrix: np.ndarray = np.eye(1)
+        self.damping_matrix: np.ndarray = np.zeros((1, 1))
+        self.stiffness_matrix: np.ndarray = np.eye(1)
+        self.dimension: int = 1
+        self.polynomial_degree: int = 3
+
+    def external_term(self, adimensional_time: ArrayLike) -> np.ndarray:
+        raise NotImplementedError("Subclasses must implement external_term.")
+
+    def nonlinear_term(self, q: ArrayLike, adimensional_time: ArrayLike) -> np.ndarray:
+        raise NotImplementedError("Subclasses must implement nonlinear_term.")
+
+    def jacobian_nonlinear_term(self, q: ArrayLike, adimensional_time: ArrayLike) -> np.ndarray:
+        raise NotImplementedError("Subclasses must implement jacobian_nonlinear_term.")
