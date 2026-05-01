@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from pyhbm import SecondOrderODE, FrequencyDomainSecondOrderODE, FrequencyDomainSecondOrderODE_Real, HarmonicBalanceMethod; print\\('imports OK'\\)\")"
+    ]
+  }
+}

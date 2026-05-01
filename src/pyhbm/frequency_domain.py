@@ -2,7 +2,7 @@ import numpy as np
 from numpy import array, concatenate, unique, hstack, array_split, vstack, einsum, pi, linspace, zeros, eye, kron, diag, where, block, zeros_like, vdot, sqrt
 from numpy.fft import rfft, irfft, fft, ifft
 
-from .dynamical_system import FirstOrderODE
+from .dynamical_system import FirstOrderODE, SecondOrderODE
 
 
 # %%
@@ -265,13 +265,13 @@ class FrequencyDomainFirstOrderODE(object):
     def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
         state = x.fourier
         nonlinear_term = self.compute_nonlinear_term(state)
-        linear_term_coefficients = self.ode.linear_coefficient @ state.coefficients - state.get_adimensional_time_derivative() * x.omega
-        residue_coefficients = linear_term_coefficients + nonlinear_term.coefficients + self.external_term.coefficients # complex array
+        linear_term_coefficients = self.ode.linear_coefficient @ state.coefficients #where A = -w^2M+jwC+K and F_lin = A*Q
+        residue_coefficients = linear_term_coefficients + nonlinear_term.coefficients - self.external_term.coefficients # complex array
         return Fourier.coefficients_to_RI(residue_coefficients) # real array
     
     # Derivative of Residue with respect to omega in Real-Imaginary Format
-    def compute_derivative_wrt_omega_RI(self, state: Fourier) -> array:
-        derivative_wrt_omega = -state.get_adimensional_time_derivative()
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        derivative_wrt_omega = -x.fourier.get_adimensional_time_derivative()
         R = vstack(derivative_wrt_omega.real)
         I = vstack(derivative_wrt_omega.imag)
         return vstack((R, I))
@@ -384,5 +384,100 @@ class FrequencyDomainFirstOrderODE_Complex(FrequencyDomainFirstOrderODE):
         J_II = jacobian_nonlinear_term.II + self.jacobian_linear_term.RR
         
         return block([[J_RR, J_RI], [J_IR, J_II]])
+
+class FrequencyDomainSecondOrderODE(object):
+    """
+    Base class for the HBM residual of a 2nd-order ODE:
+        M*q'' + C*q' + K*q + fnl(q, tau) = fext(tau)
+
+    In the frequency domain, harmonic n has the linear operator:
+        A_n = K - n^2*omega^2*M + j*n*omega*C
+    """
+    def __init__(self, second_order_ode: SecondOrderODE) -> None:
+        self.ode = second_order_ode
+        self.complex_dimension = Fourier.number_of_harmonics * self.ode.dimension
+        self.real_dimension = self.complex_dimension * 2
+        self.external_term = self.compute_external_force()
+
+    def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
+        omega = x.omega
+        n = Fourier.harmonics          # shape (nh,)
+        Q = state.coefficients         # shape (nh, ndof, 1)
+        M, C, K = self.ode.mass_matrix, self.ode.damping_matrix, self.ode.stiffness_matrix
+
+        # A_n @ Q_n = (K - n^2*omega^2*M + j*n*omega*C) @ Q_n  for each harmonic n
+        linear_coefficients = (
+            K @ Q
+            + einsum('i,ijk->ijk', -n**2 * omega**2, M @ Q)
+            + einsum('i,ijk->ijk',  1j * n * omega,  C @ Q)
+        )
+        nonlinear_term = self.compute_nonlinear_term(state)
+        residue_coefficients = linear_coefficients + nonlinear_term.coefficients - self.external_term.coefficients
+        return Fourier.coefficients_to_RI(residue_coefficients)
+
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        """dR/domega = (-2*n^2*omega*M + j*n*C) @ Q_n  per harmonic n"""
+        n = Fourier.harmonics
+        Q = x.fourier.coefficients
+        M, C = self.ode.mass_matrix, self.ode.damping_matrix
+        deriv_coefficients = (
+            einsum('i,ijk->ijk', -2 * n**2 * x.omega, M @ Q)
+            + einsum('i,ijk->ijk', 1j * n,             C @ Q)
+        )
+        R = vstack(deriv_coefficients.real)
+        I = vstack(deriv_coefficients.imag)
+        return vstack((R, I))
+
+    def compute_external_force(self) -> Fourier:
+        pass
+
+    def compute_nonlinear_term(self, state: Fourier) -> Fourier:
+        pass
+
+    def compute_jacobian_nonlinear_term(self, state: Fourier) -> JacobianFourier:
+        pass
+
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        pass
+
+
+class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
+    """
+    HBM frequency-domain residual for real-valued 2nd-order systems.
+    Uses the real FFT (rFFT).
+    """
+
+    def compute_external_force(self) -> Fourier_Real:
+        return Fourier_Real.new_from_time_series(self.ode.external_term(Fourier.adimensional_time_samples))
+
+    def compute_nonlinear_term(self, state: Fourier_Real) -> Fourier_Real:
+        Fourier_Real.compute_time_series(state)
+        fnl_time_series = self.ode.nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
+        return Fourier_Real.new_from_time_series(fnl_time_series)
+
+    def compute_jacobian_nonlinear_term(self, state: Fourier_Real) -> JacobianFourier_Real:
+        dfnldq_time_series = self.ode.jacobian_nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
+        return JacobianFourier_Real.new_from_time_series(dfnldq_time_series)
+
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        n = Fourier.harmonics
+        omega = x.omega
+        M, C, K = self.ode.mass_matrix, self.ode.damping_matrix, self.ode.stiffness_matrix
+        nh = Fourier.number_of_harmonics
+
+        jacobian_nl = self.compute_jacobian_nonlinear_term(x.fourier)
+
+        # Block-diagonal linear Jacobian: diag_n(K - n^2*omega^2*M) and diag_n(n*omega*C)
+        J_lin_diag  = kron(eye(nh), K) - omega**2 * kron(diag(n**2), M)
+        J_lin_cross = omega * kron(diag(n), C)
+
+        J_RR = jacobian_nl.RR + J_lin_diag
+        J_RI = jacobian_nl.RI - J_lin_cross
+        J_IR = jacobian_nl.IR + J_lin_cross
+        J_II = jacobian_nl.II + J_lin_diag
+
+        return block([[J_RR, J_RI], [J_IR, J_II]])
+
 
 # %% Test

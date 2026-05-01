@@ -7,7 +7,7 @@ from matplotlib.figure import Figure
 from scipy.integrate import solve_ivp
 from scipy.fft import fft
 
-from ..dynamical_system import FirstOrderODE
+from ..dynamical_system import FirstOrderODE, SecondOrderODE
 
 
 SUPPORTED_INTEGRATORS = ['RK45', 'RK23', 'Radau', 'BDF', 'LSODA']
@@ -59,7 +59,8 @@ class TimeDomainValidator:
                 f"Supported: {SUPPORTED_INTEGRATORS}"
             )
 
-        self.first_order_ode = first_order_ode
+        self.first_order_ode = first_order_ode  # kept for backwards compat
+        self.ode_system = first_order_ode       # generic: FirstOrderODE or SecondOrderODE
         self.integrator = integrator
         self.amplitude_threshold = amplitude_threshold
         self.integrator_kwargs = integrator_kwargs
@@ -95,11 +96,24 @@ class TimeDomainValidator:
         Returns:
             Time derivative of the state.
         """
-        linear = self.first_order_ode.linear_term(state)
-        nonlinear = self.first_order_ode.nonlinear_term(state, adim_time)
-        external = self.first_order_ode.external_term(adim_time)
-
-        return (linear + nonlinear + external) / omega
+        if isinstance(self.ode_system, SecondOrderODE):
+            ode = self.ode_system
+            n = ode.dimension
+            q       = state[:n]   # displacement (ndof,) or (ndof, k)
+            q_prime = state[n:]   # adimensional velocity dq/dtau
+            v = omega * q_prime   # physical velocity dq/dt = omega * dq/dtau
+            fext = ode.external_term(adim_time)
+            fnl  = ode.nonlinear_term(q, adim_time)
+            q_double_prime = np.linalg.solve(
+                ode.mass_matrix,
+                fext - ode.stiffness_matrix @ q - ode.damping_matrix @ v - fnl
+            ) / omega**2
+            return np.concatenate([q_prime, q_double_prime], axis=0)
+        else:
+            linear   = self.ode_system.linear_term(state)
+            nonlinear = self.ode_system.nonlinear_term(state, adim_time)
+            external  = self.ode_system.external_term(adim_time)
+            return (linear + nonlinear + external) / omega
 
     def validate(
         self,
@@ -134,7 +148,13 @@ class TimeDomainValidator:
                 ref_time_series.shape[1]
             )
 
-        initial_state = ref_time_series[0, :]
+        if isinstance(self.ode_system, SecondOrderODE):
+            # Approximate dq/dtau at t=0 via central finite difference (periodic)
+            dtau = 2 * np.pi / len(ref_time_series)
+            q_prime_0 = (ref_time_series[1] - ref_time_series[-1]) / (2 * dtau)
+            initial_state = np.concatenate([ref_time_series[0], q_prime_0])
+        else:
+            initial_state = ref_time_series[0, :]
 
         num_time_points_per_period = multiplier_sampling_rate * len(ref_time_series)
 
@@ -155,7 +175,10 @@ class TimeDomainValidator:
         if not sol.success:
             raise RuntimeError(f"Integration failed: {sol.message}")
 
-        td_time_series = sol.y.T
+        if isinstance(self.ode_system, SecondOrderODE):
+            td_time_series = sol.y[:self.ode_system.dimension].T  # extract q only
+        else:
+            td_time_series = sol.y.T
 
         error_metrics = self.compute_error_metrics(
             ref_time_series,

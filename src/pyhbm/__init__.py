@@ -2,6 +2,7 @@ __version__ = "2.0"
 
 from .dynamical_system import (
     FirstOrderODE,
+    SecondOrderODE,
 )
 
 from .frequency_domain import (
@@ -13,9 +14,12 @@ from .frequency_domain import (
     JacobianFourier_Real,
     JacobianFourier_Complex,
     FirstOrderODE,
+    SecondOrderODE,
     FrequencyDomainFirstOrderODE,
     FrequencyDomainFirstOrderODE_Real,
     FrequencyDomainFirstOrderODE_Complex,
+    FrequencyDomainSecondOrderODE,
+    FrequencyDomainSecondOrderODE_Real,
 )
 
 from .numerical_continuation.corrector_step import (
@@ -59,6 +63,7 @@ from .stability import (
 __all__ = [
     "__version__",
     "FirstOrderODE",
+    "SecondOrderODE",
     "Fourier",
     "Fourier_Real",
     "Fourier_Complex",
@@ -69,6 +74,8 @@ __all__ = [
     "FrequencyDomainFirstOrderODE",
     "FrequencyDomainFirstOrderODE_Real",
     "FrequencyDomainFirstOrderODE_Complex",
+    "FrequencyDomainSecondOrderODE",
+    "FrequencyDomainSecondOrderODE_Real",
     "NewtonRaphson",
     "CorrectorParameterization",
     "OrthogonalParameterization",

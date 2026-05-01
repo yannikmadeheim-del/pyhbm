@@ -49,17 +49,23 @@ class SolutionSet(object):
 		return detector.detect_all(self, stability_reports, freq_domain_ode)
 
 class HarmonicBalanceMethod:
-	def __init__(self, first_order_ode: FirstOrderODE, 
-				harmonics: np.ndarray, 
-				corrector_solver = NewtonRaphson, 
-				corrector_parameterization: CorrectorParameterization = OrthogonalParameterization, 
-				predictor: Predictor = TangentPredictorOne, 
-				step_length_adaptation: StepLengthAdaptation = ExponentialAdaptation):
-      
-		HarmonicBalanceMethod.update_dependencies(harmonics, first_order_ode.polynomial_degree)
-		
-		self.freq_domain_ode = FrequencyDomainFirstOrderODE_Real(first_order_ode) if first_order_ode.is_real_valued \
-      		else FrequencyDomainFirstOrderODE_Complex(first_order_ode)
+	def __init__(self, first_order_ode: FirstOrderODE = None,
+				harmonics: np.ndarray = None,
+				corrector_solver = NewtonRaphson,
+				corrector_parameterization: CorrectorParameterization = OrthogonalParameterization,
+				predictor: Predictor = TangentPredictorOne,
+				step_length_adaptation: StepLengthAdaptation = ExponentialAdaptation,
+				second_order_ode: SecondOrderODE = None):
+
+		ode = second_order_ode if second_order_ode is not None else first_order_ode
+		HarmonicBalanceMethod.update_dependencies(harmonics, ode.polynomial_degree)
+
+		if second_order_ode is not None:
+			self.freq_domain_ode = FrequencyDomainSecondOrderODE_Real(second_order_ode)
+		elif first_order_ode.is_real_valued:
+			self.freq_domain_ode = FrequencyDomainFirstOrderODE_Real(first_order_ode)
+		else:
+			self.freq_domain_ode = FrequencyDomainFirstOrderODE_Complex(first_order_ode)
 
 		self.solver = corrector_solver
 		self.corrector_parameterization = corrector_parameterization
@@ -81,7 +87,7 @@ class HarmonicBalanceMethod:
 			**solver_kwargs
 		).solve(initial_guess, return_jacobian=True)
 		
-		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(solution.fourier)
+		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(solution)
 		
 		return \
 			solution, \
@@ -97,7 +103,7 @@ class HarmonicBalanceMethod:
 
 	def extended_jacobian(self, x: FourierOmegaPoint):
 		jacobian = self.freq_domain_ode.compute_jacobian_of_residue_RI(x)
-		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(x.fourier)
+		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(x)
 		parameterization = self.parameterization.compute_jacobian_parameterization(asarray(x))
 		return vstack((hstack((jacobian, derivative_omega)), parameterization))
 
