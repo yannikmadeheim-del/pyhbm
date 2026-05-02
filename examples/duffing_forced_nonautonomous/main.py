@@ -98,3 +98,45 @@ from pyhbm.stability import BifurcationDetector, FloquetAnalyzer, SpecialPoint
 # validator.plot_comparison(result, degrees_of_freedom=0)#, show=False)
 # %%"""
 plot_FRF(solution_set, degrees_of_freedom=0)
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# --- Run 1st order for comparison ---
+duffing_1st = DuffingForced(c=0.009, k=1.0, beta=1.0, P=1.0)
+
+duffing_solver_1st = HarmonicBalanceMethod(
+    first_order_ode=duffing_1st,
+    harmonics=[1, 3, 5, 7, 9],
+)
+
+initial_omega_1st = 0.0
+first_harmonic_1st = np.array([[1.0 + 0j], [1j * initial_omega_1st]])
+static_amplitude_1st = duffing_1st.P / duffing_1st.k
+initial_guess_1st = FourierOmegaPoint.new_from_first_harmonic(first_harmonic_1st * static_amplitude_1st,
+                                                              omega=initial_omega_1st)
+initial_reference_direction_1st = FourierOmegaPoint.new_from_first_harmonic(first_harmonic_1st, omega=1)
+
+solution_set_1st = duffing_solver_1st.solve_and_continue(
+    initial_guess=initial_guess_1st,
+    initial_reference_direction=initial_reference_direction_1st,
+    maximum_number_of_solutions=3500,
+    angular_frequency_range=[0.0, 15.0],
+    solver_kwargs={"maximum_iterations": 200, "absolute_tolerance": duffing_1st.P * 1e-6},
+    step_length_adaptation_kwargs={"base": 2, "initial_step_length": 0.1, "maximum_step_length": 10.0,
+                                   "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
+)
+
+
+# --- Compare on same plot ---
+def solution_norm(solution_set, dof=0):
+    return [np.linalg.norm(f.coefficients[:, dof, 0]) for f in solution_set.fourier]
+
+
+fig, ax = plt.subplots()
+ax.plot(solution_set.omega, solution_norm(solution_set), label='2nd order')
+ax.plot(solution_set_1st.omega, solution_norm(solution_set_1st), label='1st order', linestyle='--')
+ax.set_xlabel('ω')
+ax.set_ylabel('||Q||')
+ax.legend()
+plt.show()
