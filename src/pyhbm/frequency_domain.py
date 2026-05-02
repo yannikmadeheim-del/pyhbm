@@ -2,7 +2,7 @@ import numpy as np
 from numpy import array, concatenate, unique, hstack, array_split, vstack, einsum, pi, linspace, zeros, eye, kron, diag, where, block, zeros_like, vdot, sqrt
 from numpy.fft import rfft, irfft, fft, ifft
 
-from .dynamical_system import FirstOrderODE
+from .dynamical_system import FirstOrderODE, SecondOrderODE
 
 
 # %%
@@ -217,21 +217,21 @@ class JacobianFourier(object):
         pass
 
 class JacobianFourier_Real(JacobianFourier):
-    
+
     def new_from_time_series(time_series: array):
         """
         Computes the JacobianFourier coefficients given a time series by executing the fast Fourier transform (FFT)
         """
         all_coefficients = fft(time_series, axis=0)
         return JacobianFourier_Real.new_given_all_coefficients(all_coefficients)
-    
+
     def new_given_all_coefficients(all_coefficients: array):
 
         state = array([all_coefficients[harmonics] for harmonics in JacobianFourier.harmonics_state]) # row by row
         state_conj = array([all_coefficients[harmonics] for harmonics in JacobianFourier.harmonics_state_conj])
         state_real = hstack(concatenate(state + state_conj, axis=1)) / Fourier.number_of_time_samples
         state_imag = hstack(concatenate(state - state_conj, axis=1)) / Fourier.number_of_time_samples
-        
+
         return JacobianFourier_Real(RR = state_real.real, RI = -state_imag.imag, IR = state_real.imag, II = state_imag.real)
 
 class JacobianFourier_Complex(JacobianFourier):
@@ -395,7 +395,6 @@ class FrequencyDomainSecondOrderODE(object):
         self.real_dimension = self.complex_dimension * 2
 
         self.external_term = self.compute_external_force()
-        self.jacobian_linear_term = self.compute_jacobian_linear_term()
 
         self.jacobian_adimensional_time_derivative_term = kron(diag(Fourier.harmonics), eye(self.ode.dimension))
 
@@ -473,19 +472,30 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
         fnl_time_series = self.ode.nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
         return Fourier_Real.new_from_time_series(fnl_time_series)
 
-    def compute_jacobian_nonlinear_term(self, state: Fourier_Real) -> JacobianFourier_Real:
+    def compute_jacobian_nonlinear_term(self, x: FourierOmegaPoint) -> JacobianFourier_Real:
+        state = x.fourier
+        ome = x.omega
         dfnldq_time_series = self.ode.jacobian_nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
-        return JacobianFourier_Real.new_from_time_series(dfnldq_time_series)
+        dfnldqdot_time_series = self.ode.jacobian_nonlinear_term_qdot(state.time_series, Fourier.adimensional_time_samples)
+        jac_q = JacobianFourier_Real.new_from_time_series(dfnldq_time_series)
+        jac_qdot = JacobianFourier_Real.new_from_time_series(dfnldqdot_time_series)
+        col_scale = kron(diag(ome * Fourier.harmonics), eye(self.ode.dimension))
+        return JacobianFourier_Real(
+            RR=jac_q.RR + jac_qdot.RI @ col_scale,
+            RI=jac_q.RI - jac_qdot.RR @ col_scale,
+            IR=jac_q.IR + jac_qdot.II @ col_scale,
+            II=jac_q.II - jac_qdot.IR @ col_scale
+        )
 
     # Jacobian of Residue for Real-Valued Systems in Real-Imaginary Format
     def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
-        jacobian_nonlinear_term = self.compute_jacobian_nonlinear_term(x.fourier)
-        aux = self.jacobian_adimensional_time_derivative_term * x.omega
+        jacobian_linear_term = self.compute_jacobian_linear_term(x.omega)
+        jacobian_nonlinear_term = self.compute_jacobian_nonlinear_term(x)
 
-        J_RR = jacobian_nonlinear_term.RR + self.jacobian_linear_term.RR
-        J_RI = jacobian_nonlinear_term.RI + aux
-        J_IR = jacobian_nonlinear_term.IR - aux
-        J_II = jacobian_nonlinear_term.II + self.jacobian_linear_term.II
+        J_RR = jacobian_nonlinear_term.RR + jacobian_linear_term.RR
+        J_RI = jacobian_nonlinear_term.RI + jacobian_linear_term.RI
+        J_IR = jacobian_nonlinear_term.IR + jacobian_linear_term.IR
+        J_II = jacobian_nonlinear_term.II + jacobian_linear_term.II
 
         return block([[J_RR, J_RI], [J_IR, J_II]])
 

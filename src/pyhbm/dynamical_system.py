@@ -116,3 +116,6 @@ class SecondOrderODE:
 
     def jacobian_nonlinear_term(self, q: ArrayLike, adimensional_time: ArrayLike) -> np.ndarray:
         raise NotImplementedError("Subclasses must implement jacobian_nonlinear_term.")
+
+    def jacobian_nonlinear_term_qdot(self, q: ArrayLike, adimensional_time: ArrayLike) -> np.ndarray:
+        raise NotImplementedError("Subclasses must implement jacobian_nonlinear_term.")

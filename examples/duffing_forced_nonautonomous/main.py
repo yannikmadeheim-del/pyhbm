@@ -7,16 +7,16 @@ from dynamical_system import *
 
 from pyhbm import *
 
-duffing = DuffingForced(c=0.009, k=1.0, beta=1.0, P=1.0)  # Create an instance of Duffing
+duffing = DuffingForced_SecondOrder(c=0.009, k=1.0, beta=1.0, P=1.0)  # Create an instance of Duffing
 
 duffing_solver = HarmonicBalanceMethod(
-    first_order_ode = duffing, 
+    second_order_ode = duffing,
     harmonics = [1,3,5,7,9], 
 )
 
 # Define the initial guess after defining the harmonics of the HarmonicBalanceMethod
 initial_omega = 0.0
-first_harmonic = np.array([[1],[1j*initial_omega]]) * 1
+first_harmonic = np.array([[1.0+0j]])
 static_amplitude = duffing.P/duffing.k
 initial_guess = FourierOmegaPoint.new_from_first_harmonic(first_harmonic * static_amplitude, omega=initial_omega)
 initial_reference_direction = FourierOmegaPoint.new_from_first_harmonic(first_harmonic, omega=1)
@@ -42,57 +42,58 @@ solution_set = duffing_solver.solve_and_continue(
 from pyhbm import plot_FRF
 from pyhbm.stability import BifurcationDetector, FloquetAnalyzer, SpecialPoint
 
-# Analyze stability
-print("Computing stability reports...")
-analyzer = FloquetAnalyzer(duffing)
-stability_reports = []
-for i, fourier in enumerate(solution_set.fourier):
-    if fourier.time_series is None:
-        fourier.compute_time_series()
-    report = analyzer.analyze(fourier.time_series, Fourier.adimensional_time_samples, solution_set.omega[i])
-    stability_reports.append(report)
-print(f"Computed {len(stability_reports)} stability reports")
-
-# Detect bifurcations
-print("Detecting bifurcations...")
-detector = BifurcationDetector()
-#bifurcations = detector.detect_all(solution_set, stability_reports)
-#print(f"Detected {len(bifurcations)} bifurcation points:")
-#for bif in bifurcations:
-#    print(bif.__str__(verbose=True), '\n')
-
-# Plot FRF with stability and bifurcations
-plot_FRF(
-    solution_set, 
-    degrees_of_freedom=0,
-    time_domain_ode=duffing,
-    stability_reports=stability_reports, #bifurcations=bifurcations,
-    xscale='log', 
-    yscale='log'
-)
-
-# %% Time-Domain Validation
-from pyhbm import TimeDomainValidator
-
-validator = TimeDomainValidator(duffing, integrator='RK45')
-
-index_to_validate = 1046
-fourier = solution_set.fourier[index_to_validate]
-omega = solution_set.omega[index_to_validate]
-
-time_series = fourier.time_series
-
-print(f"\nValidating solution at omega = {omega:.4f}")
-
-result = validator.validate(
-    time_series=time_series,
-    omega=omega,
-    multiplier_sampling_rate=40
-)
-
-print(f" Relative RMS error:\t{result.relative_rms_error:.6e}")
-print(f" Relative Max error:\t{result.relative_max_error:.6e}")
-print(f" Phase error:\t{result.phase_error:.6e}")
-
-validator.plot_comparison(result, degrees_of_freedom=0)#, show=False)
-# %%
+# # Analyze stability
+# print("Computing stability reports...")
+# analyzer = FloquetAnalyzer(duffing)
+# stability_reports = []
+# for i, fourier in enumerate(solution_set.fourier):
+#     if fourier.time_series is None:
+#         fourier.compute_time_series()
+#     report = analyzer.analyze(fourier.time_series, Fourier.adimensional_time_samples, solution_set.omega[i])
+#     stability_reports.append(report)
+# print(f"Computed {len(stability_reports)} stability reports")
+#
+# # Detect bifurcations
+# print("Detecting bifurcations...")
+# detector = BifurcationDetector()
+# #bifurcations = detector.detect_all(solution_set, stability_reports)
+# #print(f"Detected {len(bifurcations)} bifurcation points:")
+# #for bif in bifurcations:
+# #    print(bif.__str__(verbose=True), '\n')
+#
+# # Plot FRF with stability and bifurcations
+# plot_FRF(
+#     solution_set,
+#     degrees_of_freedom=0,
+#     time_domain_ode=duffing,
+#     stability_reports=stability_reports, #bifurcations=bifurcations,
+#     xscale='log',
+#     yscale='log'
+# )
+#
+#
+# # %% Time-Domain Validation
+# from pyhbm import TimeDomainValidator
+#
+# validator = TimeDomainValidator(duffing, integrator='RK45')
+#
+# index_to_validate = 1046
+# fourier = solution_set.fourier[index_to_validate]
+# omega = solution_set.omega[index_to_validate]
+#
+# time_series = fourier.time_series
+#
+# print(f"\nValidating solution at omega = {omega:.4f}")
+#
+# result = validator.validate(
+#     time_series=time_series,
+#     omega=omega,
+#     multiplier_sampling_rate=40
+# )
+#
+# print(f" Relative RMS error:\t{result.relative_rms_error:.6e}")
+# print(f" Relative Max error:\t{result.relative_max_error:.6e}")
+# print(f" Phase error:\t{result.phase_error:.6e}")
+#
+# validator.plot_comparison(result, degrees_of_freedom=0)#, show=False)
+# %%"""

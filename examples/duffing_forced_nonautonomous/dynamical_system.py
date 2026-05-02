@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import numpy as np
 from numpy import cos, sin, array, concatenate
-from pyhbm.dynamical_system import FirstOrderODE
+from pyhbm.dynamical_system import FirstOrderODE, SecondOrderODE
 
 #%%
 class DuffingForced(FirstOrderODE):
@@ -181,8 +181,8 @@ class DuffingForced_SecondOrder(SecondOrderODE):
 		self.beta = beta
 		self.P = P  # also serves as reference force level
 		self.mass_matrix = np.eye(1)
-		self.damping_matrix = np.array([c])
-		self.stiffness_matrix = np.array([k])
+		self.damping_matrix = np.array([[c]])
+		self.stiffness_matrix = np.array([[k]])
 		self.dimension = 1  		# 1 dimensional in second order and 2 dimensional in first order
 		self.polynomial_degree = 3
 
@@ -194,9 +194,9 @@ class DuffingForced_SecondOrder(SecondOrderODE):
 		:return: External force array
 		"""
 		force_ext = self.P * cos(adimensional_time)
-		return array([force_ext]).transpose()
+		return array([[force_ext]]).transpose()
 
-	def nonlinear_term(self, q: np.ndarray) -> np.ndarray:
+	def nonlinear_term(self, q: np.ndarray, adimensional_time: np.ndarray) -> np.ndarray:
 		"""
 		Calculates the nonlinear term.
 
@@ -217,19 +217,29 @@ class DuffingForced_SecondOrder(SecondOrderODE):
 		return (
 			- self.stiffness_matrix @ q
 			- self.damping_matrix @ q_dot
-			+ self.nonlinear_term(q)
+			+ self.nonlinear_term(q, adimensional_time)
 			+ self.external_term(adimensional_time)
 		)
 
 	def jacobian_nonlinear_term(self, q: np.ndarray, adimensional_time: np.ndarray) -> np.ndarray:
 		"""
-		Computes the Jacobian of the nonlinear term.
+		Computes the Jacobian of the nonlinear term. dfnl/dq
 
 		:param q: Displacement vector
 		:return: Jacobian of the nonlinear term
 		"""
 		dfnldq = -3 * self.beta * np.power(q,2)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]  # Correct coefficient for cubic nonlinearity
 		return dfnldq
+
+	def jacobian_nonlinear_term_qdot(self, q: np.ndarray, adimensional_time: np.ndarray) -> np.ndarray:
+		"""
+		Computes the Jacobian of the nonlinear term. dfnl/dqdot
+
+		:param q: Displacement vector
+		:return: Jacobian of the nonlinear term
+		"""
+		dfnldqdot = np.zeros_like(q)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]  # Correct coefficient for cubic nonlinearity
+		return dfnldqdot
 
 	def jacobian_parameters(self,
 	                        q: np.ndarray,
