@@ -87,7 +87,7 @@ class HarmonicBalanceMethod:
 			**solver_kwargs
 		).solve(initial_guess, return_jacobian=True)
 		
-		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(solution.fourier)
+		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(solution)
 		
 		return \
 			solution, \
@@ -103,7 +103,7 @@ class HarmonicBalanceMethod:
 
 	def extended_jacobian(self, x: FourierOmegaPoint):
 		jacobian = self.freq_domain_ode.compute_jacobian_of_residue_RI(x)
-		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(x.fourier)
+		derivative_omega = self.freq_domain_ode.compute_derivative_wrt_omega_RI(x)
 		parameterization = self.parameterization.compute_jacobian_parameterization(asarray(x))
 		return vstack((hstack((jacobian, derivative_omega)), parameterization))
 

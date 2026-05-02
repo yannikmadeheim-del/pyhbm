@@ -11,7 +11,7 @@ duffing = DuffingForced_SecondOrder(c=0.009, k=1.0, beta=1.0, P=1.0)  # Create a
 
 duffing_solver = HarmonicBalanceMethod(
     second_order_ode = duffing,
-    harmonics = [1,3,5,7,9], 
+    harmonics = [1,3,5,7,9],
 )
 
 # Define the initial guess after defining the harmonics of the HarmonicBalanceMethod
@@ -97,3 +97,4 @@ from pyhbm.stability import BifurcationDetector, FloquetAnalyzer, SpecialPoint
 #
 # validator.plot_comparison(result, degrees_of_freedom=0)#, show=False)
 # %%"""
+plot_FRF(solution_set, degrees_of_freedom=0)

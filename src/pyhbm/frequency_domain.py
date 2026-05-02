@@ -270,7 +270,8 @@ class FrequencyDomainFirstOrderODE(object):
         return Fourier.coefficients_to_RI(residue_coefficients) # real array
     
     # Derivative of Residue with respect to omega in Real-Imaginary Format
-    def compute_derivative_wrt_omega_RI(self, state: Fourier) -> array:
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
         derivative_wrt_omega = -state.get_adimensional_time_derivative()
         R = vstack(derivative_wrt_omega.real)
         I = vstack(derivative_wrt_omega.imag)

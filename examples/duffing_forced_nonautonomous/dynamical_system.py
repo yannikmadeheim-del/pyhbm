@@ -203,7 +203,7 @@ class DuffingForced_SecondOrder(SecondOrderODE):
 		:param q: desplacement vector
 		:return: Nonlinear term array
 		"""
-		fnl = -self.beta * np.power(q, 3)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]
+		fnl = self.beta * np.power(q, 3)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]
 		return fnl
 
 	def all_terms(self, q: np.ndarray, q_dot: np.ndarray, adimensional_time: np.ndarray) -> np.ndarray:
@@ -217,7 +217,7 @@ class DuffingForced_SecondOrder(SecondOrderODE):
 		return (
 			- self.stiffness_matrix @ q
 			- self.damping_matrix @ q_dot
-			+ self.nonlinear_term(q, adimensional_time)
+			- self.nonlinear_term(q, adimensional_time)
 			+ self.external_term(adimensional_time)
 		)
 
@@ -228,7 +228,7 @@ class DuffingForced_SecondOrder(SecondOrderODE):
 		:param q: Displacement vector
 		:return: Jacobian of the nonlinear term
 		"""
-		dfnldq = -3 * self.beta * np.power(q,2)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]  # Correct coefficient for cubic nonlinearity
+		dfnldq = 3 * self.beta * np.power(q,2)  # * array(cos(adimensional_time))[...,np.newaxis,np.newaxis]  # Correct coefficient for cubic nonlinearity
 		return dfnldq
 
 	def jacobian_nonlinear_term_qdot(self, q: np.ndarray, adimensional_time: np.ndarray) -> np.ndarray:
