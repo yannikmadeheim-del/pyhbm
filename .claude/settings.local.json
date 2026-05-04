@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python main.py)"
+      "Bash(python main.py)",
+      "Bash(python:*)"
     ]
   }
 }

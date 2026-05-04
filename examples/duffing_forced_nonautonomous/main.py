@@ -7,6 +7,9 @@ from dynamical_system import *
 
 from pyhbm import *
 
+from time import time
+
+t0 = time()
 duffing = DuffingForced_SecondOrder(c=0.009, k=1.0, beta=1.0, P=1.0)  # Create an instance of Duffing
 
 duffing_solver = HarmonicBalanceMethod(
@@ -38,7 +41,7 @@ solution_set = duffing_solver.solve_and_continue(
         "goal_number_of_iterations": 3
     }
 )
-
+print(f"Time 2nd Order: {time() - t0:.3f} s")
 from pyhbm import plot_FRF
 from pyhbm.stability import BifurcationDetector, FloquetAnalyzer, SpecialPoint
 
@@ -102,6 +105,7 @@ plot_FRF(solution_set, degrees_of_freedom=0)
 import matplotlib.pyplot as plt
 import numpy as np
 
+t1 = time()
 # --- Run 1st order for comparison ---
 duffing_1st = DuffingForced(c=0.009, k=1.0, beta=1.0, P=1.0)
 
@@ -126,7 +130,7 @@ solution_set_1st = duffing_solver_1st.solve_and_continue(
     step_length_adaptation_kwargs={"base": 2, "initial_step_length": 0.1, "maximum_step_length": 10.0,
                                    "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
 )
-
+print(f"Time 1st Order: {time() - t1:.3f} s")
 
 # --- Compare on same plot ---
 def solution_norm(solution_set, dof=0):
