@@ -404,7 +404,7 @@ class FrequencyDomainSecondOrderODE(object):
         state = x.fourier
         ome = x.omega
         n = Fourier.harmonics
-        nonlinear_term = self.compute_nonlinear_term(state)
+        nonlinear_term = self.compute_nonlinear_term(x)
         linear_term_coefficients = (self.ode.stiffness_matrix @ state.coefficients                                                    # f_lin = (-(omega*n)**2*M + j*(omega*n)*C + K) @ Q for every harmonic n
                 + einsum('i,ijk->ijk', -n ** 2 * ome ** 2, self.ode.mass_matrix @ state.coefficients)
                 + einsum('i,ijk->ijk', 1j * n * ome, self.ode.damping_matrix @ state.coefficients))
@@ -416,8 +416,16 @@ class FrequencyDomainSecondOrderODE(object):
         state = x.fourier
         ome = x.omega
         n = Fourier.harmonics
-        derivative_wrt_omega = (einsum('i,ijk->ijk', -2*ome*n**2, self.ode.mass_matrix @ state.coefficients)
+        derivative_linear = (einsum('i,ijk->ijk', -2*ome*n**2, self.ode.mass_matrix @ state.coefficients)
                 + einsum('i,ijk->ijk', 1j*n, self.ode.damping_matrix @ state.coefficients))
+        Fourier_Real.compute_time_series(state)
+        q = state.time_series
+        q_prime_fourier = Fourier_Real(einsum('i,ijk->ijk', 1j * n, state.coefficients))
+        Fourier_Real.compute_time_series(q_prime_fourier)
+        q_prime = q_prime_fourier.time_series
+        dfnldqdot = self.ode.jacobian_nonlinear_term_qdot(q, q_prime*ome, Fourier.adimensional_time_samples)
+        derivative_nonlinear = Fourier_Real.new_from_time_series(dfnldqdot @ q_prime)
+        derivative_wrt_omega = derivative_linear + derivative_nonlinear.coefficients
         R = vstack(derivative_wrt_omega.real)
         I = vstack(derivative_wrt_omega.imag)
         return vstack((R, I))
@@ -468,16 +476,24 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
         return Fourier_Real.new_from_time_series(external_term_time_series)
 
     # Nonlinear Term for Real-Valued Systems
-    def compute_nonlinear_term(self, state: Fourier_Real) -> Fourier_Real:
+    def compute_nonlinear_term(self, x: FourierOmegaPoint) -> Fourier_Real:
+        state = x.fourier
+        ome = x.omega
         Fourier_Real.compute_time_series(state)
-        fnl_time_series = self.ode.nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
+        qdot_coefficients = 1j * ome * einsum('i,ijk->ijk', Fourier.harmonics, state.coefficients)
+        qdot_fourier = Fourier_Real(qdot_coefficients)
+        Fourier_Real.compute_time_series(qdot_fourier)
+        fnl_time_series = self.ode.nonlinear_term(state.time_series, qdot_fourier.time_series, Fourier.adimensional_time_samples)
         return Fourier_Real.new_from_time_series(fnl_time_series)
 
     def compute_jacobian_nonlinear_term(self, x: FourierOmegaPoint) -> JacobianFourier_Real:
         state = x.fourier
         ome = x.omega
-        dfnldq_time_series = self.ode.jacobian_nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
-        dfnldqdot_time_series = self.ode.jacobian_nonlinear_term_qdot(state.time_series, Fourier.adimensional_time_samples)
+        qdot_coefficients = 1j * ome * einsum('i,ijk->ijk', Fourier.harmonics, state.coefficients)
+        qdot_fourier = Fourier_Real(qdot_coefficients)
+        Fourier_Real.compute_time_series(qdot_fourier)
+        dfnldq_time_series = self.ode.jacobian_nonlinear_term(state.time_series, qdot_fourier.time_series, Fourier.adimensional_time_samples)
+        dfnldqdot_time_series = self.ode.jacobian_nonlinear_term_qdot(state.time_series, qdot_fourier.time_series, Fourier.adimensional_time_samples)
         jac_q = JacobianFourier_Real.new_from_time_series(dfnldq_time_series)
         jac_qdot = JacobianFourier_Real.new_from_time_series(dfnldqdot_time_series)
         col_scale = kron(diag(ome * Fourier.harmonics), eye(self.ode.dimension))
@@ -500,46 +516,5 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
 
         return block([[J_RR, J_RI], [J_IR, J_II]])
 
-
-class FrequencyDomainFirstOrderODE_Complex(FrequencyDomainFirstOrderODE):
-    """
-    # The following methods are for systems where the external force and nonlinear terms are complex-valued
-    # and the Fourier coefficients are computed using the FFT (FFT).
-    """
-
-    # Linear Jacobian for Complex-Valued Systems
-    def compute_jacobian_linear_term(self) -> JacobianFourier_Complex:
-        linear = kron(eye(Fourier.number_of_harmonics), self.ode.linear_coefficient)
-        # IR = -RI = linear.imag
-        # II = RR = linear.real
-        return JacobianFourier_Complex(RR=linear.real, RI=-linear.imag, IR=None, II=None)
-
-    # External Force for Complex-Valued Systems
-    def compute_external_force(self) -> Fourier_Complex:
-        external_term_time_series = self.ode.external_term(Fourier.adimensional_time_samples)
-        return Fourier_Complex.new_from_time_series(external_term_time_series)
-
-    # Nonlinear Term for Complex-Valued Systems
-    def compute_nonlinear_term(self, state: Fourier_Complex) -> Fourier_Complex:
-        Fourier_Complex.compute_time_series(state)
-        fnl_time_series = self.ode.nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
-        return Fourier_Complex.new_from_time_series(fnl_time_series)
-
-    # Jacobian of Nonlinear Term for Complex-Valued Systems
-    def compute_jacobian_nonlinear_term(self, state: Fourier_Complex) -> JacobianFourier_Complex:
-        dfnldq_time_series = self.ode.jacobian_nonlinear_term(state.time_series, Fourier.adimensional_time_samples)
-        return JacobianFourier_Complex.new_from_time_series(dfnldq_time_series)
-
-    # Jacobian of Residue for Complex-Valued Systems in Real-Imaginary Format
-    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
-        jacobian_nonlinear_term = self.compute_jacobian_nonlinear_term(x.fourier)
-        aux = self.jacobian_linear_term.RI + self.jacobian_adimensional_time_derivative_term * x.omega
-
-        J_RR = jacobian_nonlinear_term.RR + self.jacobian_linear_term.RR
-        J_RI = jacobian_nonlinear_term.RI + aux
-        J_IR = jacobian_nonlinear_term.IR - aux
-        J_II = jacobian_nonlinear_term.II + self.jacobian_linear_term.RR
-
-        return block([[J_RR, J_RI], [J_IR, J_II]])
-
+# class FrequencyDomainSecondOrderODE_Complex MISSING!!!!!!!!!
 # %% Test
