@@ -147,7 +147,8 @@ class FourierOmegaPoint(object):
         self.omega: float = omega
         self.RI = None
         self.time_series_derivative = None
-
+        self.second_adimensional_time_derivative = None
+        self.Gdot = None
         
     @staticmethod
     def new_from_RI_omega(RI_omega: array):
@@ -198,6 +199,11 @@ class FourierOmegaPoint(object):
             Fourier_Real.compute_time_series(qdot_fourier)
             self.time_series_derivative = qdot_fourier.time_series
         return self.time_series_derivative
+
+    def compute_second_adimensional_time_derivative(self):
+        if self.second_adimensional_time_derivative is None:
+            self.second_adimensional_time_derivative = einsum('i,ijk->ijk', Fourier.harmonics**2, self.fourier.coefficients) * -1
+        return self.second_adimensional_time_derivative
 
 #%%
 
@@ -412,16 +418,19 @@ class FrequencyDomainSecondOrderODE(object):
         self.external_term = self.compute_external_force()
 
         self.jacobian_adimensional_time_derivative_term = kron(diag(Fourier.harmonics), eye(self.ode.dimension))
+        self.kron_mass = kron(diag(Fourier.harmonics ** 2), self.ode.mass_matrix)
+        self.kron_damping = kron(diag(Fourier.harmonics), self.ode.damping_matrix)
+        self.kron_stiffness = kron(eye(Fourier.number_of_harmonics), self.ode.stiffness_matrix)
+
 
     # Residue in Real-Imaginary Format
     def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
         state = x.fourier
         ome = x.omega
-        n = Fourier.harmonics
         nonlinear_term = self.compute_nonlinear_term(x)
         linear_term_coefficients = (self.ode.stiffness_matrix @ state.coefficients                                                    # f_lin = (-(omega*n)**2*M + j*(omega*n)*C + K) @ Q for every harmonic n
-                + einsum('i,ijk->ijk', -n ** 2 * ome ** 2, self.ode.mass_matrix @ state.coefficients)
-                + einsum('i,ijk->ijk', 1j * n * ome, self.ode.damping_matrix @ state.coefficients))
+                + (ome**2) * self.ode.mass_matrix @ x.compute_second_adimensional_time_derivative()
+                + ome * self.ode.damping_matrix @ state.get_adimensional_time_derivative())
         residue_coefficients = linear_term_coefficients + nonlinear_term.coefficients - self.external_term.coefficients  # complex array
         return Fourier.coefficients_to_RI(residue_coefficients)  # real array
 
@@ -429,20 +438,18 @@ class FrequencyDomainSecondOrderODE(object):
     def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
         state = x.fourier
         ome = x.omega
-        n = Fourier.harmonics
-        derivative_linear = (einsum('i,ijk->ijk', -2*ome*n**2, self.ode.mass_matrix @ state.coefficients)
-                + einsum('i,ijk->ijk', 1j*n, self.ode.damping_matrix @ state.coefficients))
-        Fourier_Real.compute_time_series(state)
-        q = state.time_series
-        q_prime_fourier = Fourier_Real(einsum('i,ijk->ijk', 1j * n, state.coefficients))
-        Fourier_Real.compute_time_series(q_prime_fourier)
-        q_prime = q_prime_fourier.time_series
-        dfnldqdot = self.ode.jacobian_nonlinear_term_qdot(q, q_prime*ome, Fourier.adimensional_time_samples)
-        derivative_nonlinear = Fourier_Real.new_from_time_series(dfnldqdot @ q_prime)
-        derivative_wrt_omega = derivative_linear + derivative_nonlinear.coefficients
-        R = vstack(derivative_wrt_omega.real)
-        I = vstack(derivative_wrt_omega.imag)
-        return vstack((R, I))
+        qdot_adim = state.get_adimensional_time_derivative()
+        derivative_linear = (2 * ome * self.ode.mass_matrix @ x.compute_second_adimensional_time_derivative()
+                             + self.ode.damping_matrix @ qdot_adim)
+        R = vstack(derivative_linear.real)
+        I = vstack(derivative_linear.imag)
+        derivative_linear_RI = vstack((R, I))
+        Gdot = self.compute_Gdot(x)
+        qdot_R = vstack(qdot_adim.real)
+        qdot_I = vstack(qdot_adim.imag)
+        derivative_nonlinear_RI = vstack((Gdot.RR @ qdot_R + Gdot.RI @ qdot_I,
+                                          Gdot.IR @ qdot_R + Gdot.II @ qdot_I))
+        return derivative_linear_RI + derivative_nonlinear_RI
 
     """
     # The following methods must be specified separately for real-valued and complex-valued systems.
@@ -463,6 +470,9 @@ class FrequencyDomainSecondOrderODE(object):
     def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
         pass
 
+    def compute_Gdot(self, x: FourierOmegaPoint) -> JacobianFourier_Real:
+        pass
+
 
 class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
     """
@@ -472,9 +482,9 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
 
     # Linear Jacobian for Real-Valued Systems
     def compute_jacobian_linear_term(self, omega: float) -> JacobianFourier_Real:
-        state =  - omega ** 2 * kron(diag(Fourier.harmonics ** 2), self.ode.mass_matrix) \
-                 + 1j * omega * kron(diag(Fourier.harmonics), self.ode.damping_matrix) \
-                 + kron(eye(Fourier.number_of_harmonics), self.ode.stiffness_matrix)
+        state =  - omega ** 2 * self.kron_mass \
+                 + 1j * omega * self.kron_damping\
+                 + self.kron_stiffness
 
         state_conj = kron(where(JacobianFourier.harmonics_state_conj == 0, 1, 0), -omega**2*self.ode.mass_matrix + 1j*omega*self.ode.damping_matrix + self.ode.stiffness_matrix)
 
@@ -499,9 +509,8 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
 
     def compute_jacobian_nonlinear_term(self, x: FourierOmegaPoint) -> JacobianFourier_Real:
         dfnldq_time_series = self.ode.jacobian_nonlinear_term(x.fourier.time_series, x.time_series_derivative, Fourier.adimensional_time_samples)
-        dfnldqdot_time_series = self.ode.jacobian_nonlinear_term_qdot(x.fourier.time_series, x.time_series_derivative, Fourier.adimensional_time_samples)
         G = JacobianFourier_Real.new_from_time_series(dfnldq_time_series)
-        Gdot = JacobianFourier_Real.new_from_time_series(dfnldqdot_time_series)
+        Gdot = self.compute_Gdot(x)
         col_scale = x.omega * self.jacobian_adimensional_time_derivative_term
         return JacobianFourier_Real(
             RR=G.RR + Gdot.RI @ col_scale,
@@ -521,6 +530,15 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
         J_II = jacobian_nonlinear_term.II + jacobian_linear_term.II
 
         return block([[J_RR, J_RI], [J_IR, J_II]])
+
+    # compute FFT(df/dqdot):
+    def compute_Gdot(self, x: FourierOmegaPoint) -> JacobianFourier_Real:
+        if x.Gdot is None:
+            dfnldqdot_time_series = self.ode.jacobian_nonlinear_term_qdot(x.fourier.time_series,
+                                                                          x.time_series_derivative,
+                                                                          Fourier.adimensional_time_samples)
+            x.Gdot = JacobianFourier_Real.new_from_time_series(dfnldqdot_time_series)
+        return x.Gdot
 
 # class FrequencyDomainSecondOrderODE_Complex MISSING!!!!!!!!!
 # %% Test
