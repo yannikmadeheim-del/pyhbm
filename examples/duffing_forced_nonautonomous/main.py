@@ -36,7 +36,7 @@ solution_set = duffing_solver.solve_and_continue(
     step_length_adaptation_kwargs = {
         "base": 2, 
         "initial_step_length": 0.1, 
-        "maximum_step_length": 10.0, 
+        "maximum_step_length": 1.0,
         "minimum_step_length": 5e-6, 
         "goal_number_of_iterations": 3
     }
@@ -127,7 +127,7 @@ solution_set_1st = duffing_solver_1st.solve_and_continue(
     maximum_number_of_solutions=3500,
     angular_frequency_range=[0.0, 15.0],
     solver_kwargs={"maximum_iterations": 200, "absolute_tolerance": duffing_1st.P * 1e-6},
-    step_length_adaptation_kwargs={"base": 2, "initial_step_length": 0.1, "maximum_step_length": 10.0,
+    step_length_adaptation_kwargs={"base": 2, "initial_step_length": 0.1, "maximum_step_length": 1.0,
                                    "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
 )
 print(f"Time 1st Order: {time() - t1:.3f} s")

@@ -51,15 +51,20 @@ class SolutionSet(object):
 class HarmonicBalanceMethod:
 	def __init__(self, harmonics: np.ndarray,
 				first_order_ode: FirstOrderODE = None, second_order_ode: SecondOrderODE = None,
-				corrector_solver = NewtonRaphson, 
-				corrector_parameterization: CorrectorParameterization = OrthogonalParameterization, 
-				predictor: Predictor = TangentPredictorOne, 
+				freq_domain_ode = None,
+				corrector_solver = NewtonRaphson,
+				corrector_parameterization: CorrectorParameterization = OrthogonalParameterization,
+				predictor: Predictor = TangentPredictorOne,
 				step_length_adaptation: StepLengthAdaptation = ExponentialAdaptation):
 
-		ode = first_order_ode if first_order_ode is not None else second_order_ode
+		ode = first_order_ode if first_order_ode is not None else \
+			  second_order_ode if second_order_ode is not None else \
+			  freq_domain_ode.ode
 		HarmonicBalanceMethod.update_dependencies(harmonics, ode.polynomial_degree)
 
-		if second_order_ode is not None:
+		if freq_domain_ode is not None:
+			self.freq_domain_ode = freq_domain_ode
+		elif second_order_ode is not None:
 			self.freq_domain_ode = FrequencyDomainSecondOrderODE_Real(second_order_ode)
 		elif first_order_ode.is_real_valued:
 			self.freq_domain_ode = FrequencyDomainFirstOrderODE_Real(first_order_ode)
