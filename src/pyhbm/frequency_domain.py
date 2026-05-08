@@ -3,7 +3,7 @@ from numpy import array, concatenate, unique, hstack, array_split, vstack, einsu
 from numpy.fft import rfft, irfft, fft, ifft
 
 from .dynamical_system import FirstOrderODE, SecondOrderODE
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicSpline, make_interp_spline
 
 # %%
 class Fourier(object):
@@ -565,7 +565,7 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
 
         self.external_term = self.compute_external_force()
 
-        self.interp_real = CubicSpline(omega_frf, self.Y_frf.real)  # Spline-Koeffizienten
+        self.interp_real = CubicSpline(omega_frf, self.Y_frf.real)  # Kubischer Spline
         self.interp_imag = CubicSpline(omega_frf, self.Y_frf.imag)
 
 
