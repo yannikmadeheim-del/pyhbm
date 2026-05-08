@@ -149,6 +149,8 @@ class FourierOmegaPoint(object):
         self.time_series_derivative = None
         self.second_adimensional_time_derivative = None
         self.Gdot = None
+        self.Y_frf_cache = None
+        self.nonlinear_term_cache = None
         
     @staticmethod
     def new_from_RI_omega(RI_omega: array):
@@ -501,11 +503,13 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
 
     # Nonlinear Term for Real-Valued Systems
     def compute_nonlinear_term(self, x: FourierOmegaPoint) -> Fourier_Real:
-        Fourier_Real.compute_time_series(x.fourier)
-        q = x.fourier.time_series
-        qdot = x.compute_time_series_derivative()
-        fnl_time_series = self.ode.nonlinear_term(q, qdot, Fourier.adimensional_time_samples)
-        return Fourier_Real.new_from_time_series(fnl_time_series)
+        if x.nonlinear_term_cache is None:
+            Fourier_Real.compute_time_series(x.fourier)
+            q = x.fourier.time_series
+            qdot = x.compute_time_series_derivative()
+            fnl_time_series = self.ode.nonlinear_term(q, qdot, Fourier.adimensional_time_samples)
+            x.nonlinear_term_cache = Fourier_Real.new_from_time_series(fnl_time_series)
+        return x.nonlinear_term_cache
 
     def compute_jacobian_nonlinear_term(self, x: FourierOmegaPoint) -> JacobianFourier_Real:
         dfnldq_time_series = self.ode.jacobian_nonlinear_term(x.fourier.time_series, x.time_series_derivative, Fourier.adimensional_time_samples)
@@ -565,29 +569,60 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
         self.interp_imag = CubicSpline(omega_frf, self.Y_frf.imag)
 
 
-    def compute_FRF(self, omega: float):
+    def compute_FRF(self, omega):
         d = self.ode.dimension
         Y = zeros((self.complex_dimension, self.complex_dimension), dtype=complex)
-        for k,n in enumerate(Fourier.harmonics): #B Matrix
-            n_omega = n * omega
-            Y_k = self.interpolate_Y(n_omega)  # d*d complex
-            Y[k*d:(k+1)*d, k*d:(k+1)*d] = Y_k
-        return Y
+        for k, n in enumerate(Fourier.harmonics):  # k: Block-Index, n: Harmonischenzahl
+            Y_k = self.interpolate_FRF(n * omega)  # Y(n*ω), shape (d, d) komplex
+            Y[k * d:(k + 1) * d, k * d:(k + 1) * d] = Y_k  # k-ter Diagonalblock
+        return Y  # block_diag(Y(n_1*ω), ..., Y(n_N*ω)), shape (N*d, N*d)
 
-    def interpolate_Y(self, omega: float) -> array:
+    def get_FRF_cache(self, x):
+        if x.Y_frf_cache is None:
+            x.Y_frf_cache = self.compute_FRF(x.omega)
+        return x.Y_frf_cache
+
+    def interpolate_FRF(self, omega: float) -> array:
         return self.interp_real(omega) + 1j * self.interp_imag(omega)
 
-
-
-    def compute_derivative_Y_wrt_omega_RI
+    def FRF_to_RI(self, FRF):
+        return block([[FRF.real, -FRF.imag], [FRF.imag, FRF.real]])  # [[Re, -Im], [Im, Re]]
 
     def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
+        nonlinear_term = self.compute_nonlinear_term(x)
+        Q = vstack(state.coefficients)
+        Y = self.get_FRF_cache(x)
+        Fnl = vstack(nonlinear_term.coefficients)
+        Fext = vstack(self.external_term.coefficients)
+        R = Q + Y@Fnl - Y@Fext  # R = Q + Y @ Fnl - Y @ Fext
+        return vstack((R.real, R.imag))
 
     def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        Jnl = self.compute_jacobian_nonlinear_term(x)
+        Jnl_RI = block([[Jnl.RR, Jnl.RI], [Jnl.IR, Jnl.II]])
+        Y = self.get_FRF_cache(x)
+        Y_RI = self.FRF_to_RI(Y)
+        return eye(self.real_dimension) + Y_RI@Jnl_RI  # J = I + Y_RI @ Jnl_RI
 
     def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
+        Y = self.FRF_to_RI(self.get_FRF_cache(x))
+        derivative_FRF = self.compute_FRF_derivative_wrt_omega_RI(x.omega)
+        nonlinear_term = self.compute_nonlinear_term(x)
+        Fnl = Fourier.coefficients_to_RI(nonlinear_term.coefficients)
+        Fext = Fourier.coefficients_to_RI(self.external_term.coefficients)
+        qdot_adim = state.get_adimensional_time_derivative()
+        Gdot = self.compute_Gdot(x)
+        qdot_R = vstack(qdot_adim.real)
+        qdot_I = vstack(qdot_adim.imag)
+        derivative_nonlinear_RI = vstack((Gdot.RR @ qdot_R + Gdot.RI @ qdot_I,
+                                          Gdot.IR @ qdot_R + Gdot.II @ qdot_I))  # dF_nl/dω = G_dot @ q_dot_adim
+        return derivative_FRF @ Fnl + Y @ derivative_nonlinear_RI - derivative_FRF @ Fext  # dR/dω = dY/dω @ Fnl + Y @ dF_nl/dω - dY/dω @ Fext
 
-
+    def compute_FRF_derivative_wrt_omega_RI(self, omega: float) -> array:
+        dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)  # zentrale FD
+        return self.FRF_to_RI(dY)
 
 
 
