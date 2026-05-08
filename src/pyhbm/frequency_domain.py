@@ -3,7 +3,7 @@ from numpy import array, concatenate, unique, hstack, array_split, vstack, einsu
 from numpy.fft import rfft, irfft, fft, ifft
 
 from .dynamical_system import FirstOrderODE, SecondOrderODE
-
+from scipy.interpolate import CubicSpline
 
 # %%
 class Fourier(object):
@@ -59,7 +59,7 @@ class Fourier(object):
 
     def __add__(self, other):
         return Fourier(coefficients = self.coefficients + other.coefficients)
-    
+
     def __sub__(self, other):
         return Fourier(coefficients = self.coefficients - other.coefficients)
 
@@ -542,3 +542,83 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
 
 # class FrequencyDomainSecondOrderODE_Complex MISSING!!!!!!!!!
 # %% Test
+
+class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
+    def __init__(self, nonlinear_ode: SecondOrderODE, omega_frf: array, Y_frf:array, fd_step: float = 1e-6):
+        # omega_frf: shape (N_freq,)        — gemessene Frequenzpunkte
+        # Y_frf:     shape (N_freq, d, d)   — komplexe FRF-Matrizen
+        # fd_step:   Schrittweite für dY/dω via FD
+
+        self.ode = nonlinear_ode
+        self.complex_dimension = Fourier.number_of_harmonics * self.ode.dimension
+        self.real_dimension = self.complex_dimension * 2
+        self.jacobian_adimensional_time_derivative_term = kron(
+            diag(Fourier.harmonics), eye(self.ode.dimension))
+
+        self.omega_frf = omega_frf
+        self.Y_frf = Y_frf
+        self.fd_step = fd_step
+
+        self.external_term = self.compute_external_force()
+
+        self.interp_real = CubicSpline(omega_frf, self.Y_frf.real)  # Spline-Koeffizienten
+        self.interp_imag = CubicSpline(omega_frf, self.Y_frf.imag)
+
+
+    def compute_FRF(self, omega: float):
+        d = self.ode.dimension
+        Y = zeros((self.complex_dimension, self.complex_dimension), dtype=complex)
+        for k,n in enumerate(Fourier.harmonics): #B Matrix
+            n_omega = n * omega
+            Y_k = self.interpolate_Y(n_omega)  # d*d complex
+            Y[k*d:(k+1)*d, k*d:(k+1)*d] = Y_k
+        return Y
+
+    def interpolate_Y(self, omega: float) -> array:
+        return self.interp_real(omega) + 1j * self.interp_imag(omega)
+
+
+
+    def compute_derivative_Y_wrt_omega_RI
+
+    def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
+
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
