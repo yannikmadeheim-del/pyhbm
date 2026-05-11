@@ -131,6 +131,7 @@ class HarmonicBalanceMethod:
     
 		angular_frequency_range.sort()
 
+		solver_kwargs = dict(solver_kwargs)  # avoid mutating the caller's dict
 		solver_kwargs["absolute_tolerance"] *= sqrt(2) / Fourier.number_of_time_samples
    
 		solver = self.solver(

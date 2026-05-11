@@ -18,7 +18,7 @@ duffing = DuffingForced_SecondOrder(c=c, k=k, beta=beta, P=P)
 HarmonicBalanceMethod.update_dependencies(harmonics, duffing.polynomial_degree)
 
 # --- Analytische FRF: Y(ω) = 1 / (k - ω^2 + j*c*ω), shape (N_freq, 1, 1) ---
-omega_frf = np.linspace(0.00, 15.0, 5000)
+omega_frf = np.linspace(0.00, 15.0*9*2, 10000)
 Y_frf = (1.0 / (k - omega_frf**2 + 1j * c * omega_frf))[:, np.newaxis, np.newaxis]
 
 # --- FrequencyDomainFRF aufbauen ---
@@ -36,8 +36,11 @@ initial_guess = FourierOmegaPoint.new_from_first_harmonic(first_harmonic * stati
 initial_reference_direction = FourierOmegaPoint.new_from_first_harmonic(first_harmonic, omega=1)
 
 solver_kwargs = {"maximum_iterations": 200, "absolute_tolerance": P * 1e-6}
-step_kwargs = {"base": 2, "initial_step_length": 0.1, "maximum_step_length": 5.0,
-               "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
+step_kwargs_2nd = {"base": 2, "initial_step_length": 0.1, "maximum_step_length": 5.0,
+                     "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
+
+step_kwargs_frf = {"base": 2, "initial_step_length": 0.1, "maximum_step_length": 0.3,
+                     "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
 
 # --- FRF-Solver ---
 t0 = time()
@@ -48,7 +51,7 @@ solution_set_frf = frf_solver.solve_and_continue(
     maximum_number_of_solutions=3500,
     angular_frequency_range=[0.0, 15.0],
     solver_kwargs=solver_kwargs,
-    step_length_adaptation_kwargs=step_kwargs,
+    step_length_adaptation_kwargs=step_kwargs_frf,
 )
 print(f"Time FRF:      {time() - t0:.3f} s")
 
@@ -61,7 +64,7 @@ solution_set_2nd = duffing_solver.solve_and_continue(
     maximum_number_of_solutions=3500,
     angular_frequency_range=[0.0, 15.0],
     solver_kwargs=solver_kwargs,
-    step_length_adaptation_kwargs=step_kwargs,
+    step_length_adaptation_kwargs=step_kwargs_2nd,
 )
 print(f"Time 2nd Order: {time() - t1:.3f} s")
 
