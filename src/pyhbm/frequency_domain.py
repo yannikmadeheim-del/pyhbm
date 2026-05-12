@@ -516,6 +516,7 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
         return x.nonlinear_term_cache
 
     def compute_jacobian_nonlinear_term(self, x: FourierOmegaPoint) -> JacobianFourier_Real:
+        self.compute_nonlinear_term(x)
         dfnldq_time_series = self.ode.jacobian_nonlinear_term(x.fourier.time_series, x.time_series_derivative, Fourier.adimensional_time_samples)
         G = JacobianFourier_Real.new_from_time_series(dfnldq_time_series)
         Gdot = self.compute_Gdot(x)
@@ -551,20 +552,65 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
 # class FrequencyDomainSecondOrderODE_Complex MISSING!!!!!!!!!
 # %% Test
 
+
+
 class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
-    def __init__(self, nonlinear_ode: SecondOrderODE, omega_frf: array, Y_frf:array, fd_step: float = 1e-6):
+    def __init__(self, nonlinear_ode: SecondOrderODE, omega_frf: array, Y_frf: array, fd_step: float = 1e-6, BooleanMatrix: array = None):
         # omega_frf: shape (N_freq,)        — measured frequencypoints
         # Y_frf:     shape (N_freq, d, d)   — complex FRF-Matrices
         # fd_step:   steplength for dY/dω via finite differrence
         FrequencyDomainSecondOrderODE.__init__(self, nonlinear_ode)
+
         self.omega_frf = omega_frf
         self.Y_frf = Y_frf
         self.fd_step = fd_step
-
-        self.external_term = self.compute_external_force()
+        self.BooleanMatrix = BooleanMatrix
 
         self.interp_real = CubicSpline(omega_frf, self.Y_frf.real)  # cubic Spline
         self.interp_imag = CubicSpline(omega_frf, self.Y_frf.imag)
+
+    def FRF_to_RI(self, FRF):
+        return block([[FRF.real, -FRF.imag], [FRF.imag, FRF.real]])  # [[Re, -Im], [Im, Re]]
+
+    def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
+        nonlinear_term = self.compute_nonlinear_term(x)
+        Q = vstack(state.coefficients)
+        Y = self.get_FRF(x)
+        Fnl = vstack(nonlinear_term.coefficients)
+        Fext = vstack(self.external_term.coefficients)
+        if self.BooleanMatrix is None:
+            R = Q - Y@Fext + Y@Fnl   # R = Q + Y @ Fnl - Y @ Fext
+        else:
+            B = self.BooleanMatrix
+            R = Q - B@Y@Fext + B@Y@B.T@Fnl
+        return vstack((R.real, R.imag))
+
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        Jnl = self.compute_jacobian_nonlinear_term(x)
+        Jnl_RI = block([[Jnl.RR, Jnl.RI], [Jnl.IR, Jnl.II]])
+        Y = self.get_FRF(x)
+        if self.BooleanMatrix is None:
+            Y_RI = self.FRF_to_RI(Y)
+        else:
+            B = self.BooleanMatrix
+            Y_RI = self.FRF_to_RI(B@Y@B.T)
+        return eye(self.real_dimension) + Y_RI@Jnl_RI  # J = I + Y_RI @ Jnl_RI
+
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        state = x.fourier
+        Y = self.FRF_to_RI(self.get_FRF(x))
+        derivative_FRF = self.compute_FRF_derivative_wrt_omega_RI(x)
+        nonlinear_term = self.compute_nonlinear_term(x)
+        Fnl = Fourier.coefficients_to_RI(nonlinear_term.coefficients)
+        Fext = Fourier.coefficients_to_RI(self.external_term.coefficients)
+        qdot_adim = state.get_adimensional_time_derivative()
+        Gdot = self.compute_Gdot(x)
+        qdot_R = vstack(qdot_adim.real)
+        qdot_I = vstack(qdot_adim.imag)
+        derivative_nonlinear_RI = vstack((Gdot.RR @ qdot_R + Gdot.RI @ qdot_I,
+                                          Gdot.IR @ qdot_R + Gdot.II @ qdot_I))  # dF_nl/dω = G_dot @ q_dot_adim
+        return derivative_FRF @ Fnl + Y @ derivative_nonlinear_RI - derivative_FRF @ Fext  # dR/dω = dY/dω @ Fnl + Y @ dF_nl/dω - dY/dω @ Fext
 
     def compute_FRF(self, omega):
         d = self.ode.dimension
@@ -609,41 +655,6 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
     #
     #     return result
 
-    def FRF_to_RI(self, FRF):
-        return block([[FRF.real, -FRF.imag], [FRF.imag, FRF.real]])  # [[Re, -Im], [Im, Re]]
-
-    def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
-        state = x.fourier
-        nonlinear_term = self.compute_nonlinear_term(x)
-        Q = vstack(state.coefficients)
-        Y = self.get_FRF(x)
-        Fnl = vstack(nonlinear_term.coefficients)
-        Fext = vstack(self.external_term.coefficients)
-        R = Q + Y@Fnl - Y@Fext  # R = Q + Y @ Fnl - Y @ Fext
-        return vstack((R.real, R.imag))
-
-    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
-        Jnl = self.compute_jacobian_nonlinear_term(x)
-        Jnl_RI = block([[Jnl.RR, Jnl.RI], [Jnl.IR, Jnl.II]])
-        Y = self.get_FRF(x)
-        Y_RI = self.FRF_to_RI(Y)
-        return eye(self.real_dimension) + Y_RI@Jnl_RI  # J = I + Y_RI @ Jnl_RI
-
-    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
-        state = x.fourier
-        Y = self.FRF_to_RI(self.get_FRF(x))
-        derivative_FRF = self.compute_FRF_derivative_wrt_omega_RI(x)
-        nonlinear_term = self.compute_nonlinear_term(x)
-        Fnl = Fourier.coefficients_to_RI(nonlinear_term.coefficients)
-        Fext = Fourier.coefficients_to_RI(self.external_term.coefficients)
-        qdot_adim = state.get_adimensional_time_derivative()
-        Gdot = self.compute_Gdot(x)
-        qdot_R = vstack(qdot_adim.real)
-        qdot_I = vstack(qdot_adim.imag)
-        derivative_nonlinear_RI = vstack((Gdot.RR @ qdot_R + Gdot.RI @ qdot_I,
-                                          Gdot.IR @ qdot_R + Gdot.II @ qdot_I))  # dF_nl/dω = G_dot @ q_dot_adim
-        return derivative_FRF @ Fnl + Y @ derivative_nonlinear_RI - derivative_FRF @ Fext  # dR/dω = dY/dω @ Fnl + Y @ dF_nl/dω - dY/dω @ Fext
-
     def compute_FRF_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
         omega = x.omega
         if omega < self.omega_frf[0]+self.fd_step:
@@ -655,24 +666,6 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
     # def compute_FRF_derivative_wrt_omega_RI(self, omega: float) -> array:
     #     dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)
     #     return self.FRF_to_RI(dY)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
