@@ -10,7 +10,7 @@ from pyhbm import *
 from time import time
 
 t0 = time()
-duffing = DuffingForced_SecondOrder(c=0.009, k=1.0, beta=1.0, P=1.0)  # Create an instance of Duffing
+duffing = DuffingForced_SecondOrder(c=0.09, k=1.0, beta=1.0, P=1.0)  # Create an instance of Duffing
 
 duffing_solver = HarmonicBalanceMethod(
     second_order_ode = duffing,
@@ -107,7 +107,7 @@ import numpy as np
 
 t1 = time()
 # --- Run 1st order for comparison ---
-duffing_1st = DuffingForced(c=0.009, k=1.0, beta=1.0, P=1.0)
+duffing_1st = DuffingForced(c=0.09, k=1.0, beta=1.0, P=1.0)
 
 duffing_solver_1st = HarmonicBalanceMethod(
     first_order_ode=duffing_1st,
@@ -127,7 +127,7 @@ solution_set_1st = duffing_solver_1st.solve_and_continue(
     maximum_number_of_solutions=3500,
     angular_frequency_range=[0.0, 15.0],
     solver_kwargs={"maximum_iterations": 200, "absolute_tolerance": duffing_1st.P * 1e-6},
-    step_length_adaptation_kwargs={"base": 2, "initial_step_length": 0.1, "maximum_step_length": 5.0,
+    step_length_adaptation_kwargs={"base": 2, "initial_step_length": 0.1, "maximum_step_length": 3.0,
                                    "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
 )
 print(f"Time 1st Order: {time() - t1:.3f} s")

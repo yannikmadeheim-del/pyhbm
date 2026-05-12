@@ -151,6 +151,7 @@ class FourierOmegaPoint(object):
         self.second_adimensional_time_derivative = None
         self.Gdot = None
         self.Y_frf_cache = None
+        self.Z_frf_cache = None
         self.nonlinear_term_cache = None
         
     @staticmethod
@@ -555,19 +556,9 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
 
 
 class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
-    def __init__(self, nonlinear_ode: SecondOrderODE, omega_frf: array, Y_frf: array, fd_step: float = 1e-6, BooleanMatrix: array = None):
-        # omega_frf: shape (N_freq,)        — measured frequencypoints
-        # Y_frf:     shape (N_freq, d, d)   — complex FRF-Matrices
-        # fd_step:   steplength for dY/dω via finite differrence
+    def __init__(self, nonlinear_ode: SecondOrderODE, BooleanMatrix: array = None):
         FrequencyDomainSecondOrderODE.__init__(self, nonlinear_ode)
-
-        self.omega_frf = omega_frf
-        self.Y_frf = Y_frf
-        self.fd_step = fd_step
         self.BooleanMatrix = BooleanMatrix
-
-        self.interp_real = CubicSpline(omega_frf, self.Y_frf.real)  # cubic Spline
-        self.interp_imag = CubicSpline(omega_frf, self.Y_frf.imag)
 
     def FRF_to_RI(self, FRF):
         return block([[FRF.real, -FRF.imag], [FRF.imag, FRF.real]])  # [[Re, -Im], [Im, Re]]
@@ -612,6 +603,35 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
                                           Gdot.IR @ qdot_R + Gdot.II @ qdot_I))  # dF_nl/dω = G_dot @ q_dot_adim
         return derivative_FRF @ Fnl + Y @ derivative_nonlinear_RI - derivative_FRF @ Fext  # dR/dω = dY/dω @ Fnl + Y @ dF_nl/dω - dY/dω @ Fext
 
+
+    def get_FRF(self, x):
+        if x.Y_frf_cache is None:
+            x.Y_frf_cache = self.compute_FRF(x.omega)
+        return x.Y_frf_cache
+
+    def compute_FRF(self, omega):
+        pass
+
+    def interpolate_FRF(self, omega):
+        pass
+
+    def compute_FRF_derivative_wrt_omega_RI(self, x):
+        pass
+
+
+class FrequencyDomainFRF_experimental(FrequencyDomainFRF):
+    def __init__(self, nonlinear_ode: SecondOrderODE, omega_frf: array, Y_frf: array,
+                 fd_step: float = 1e-6, BooleanMatrix: array = None):
+        # omega_frf: shape (N_freq,)       — measured frequency points
+        # Y_frf:     shape (N_freq, d, d)  — complex FRF matrices
+        # fd_step:   step size for dY/dω via finite difference
+        super().__init__(nonlinear_ode, BooleanMatrix)
+        self.omega_frf = omega_frf
+        self.Y_frf = Y_frf
+        self.fd_step = fd_step
+        self.interp_real = CubicSpline(omega_frf, Y_frf.real)
+        self.interp_imag = CubicSpline(omega_frf, Y_frf.imag)
+
     def compute_FRF(self, omega):
         d = self.ode.dimension
         omega_harmonics = Fourier.harmonics * omega  # shape (Nh,)
@@ -621,52 +641,71 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
             Y[k * d:(k + 1) * d, k * d:(k + 1) * d] = Y_blocks[k]
         return Y
 
-    def get_FRF(self, x):
-        if x.Y_frf_cache is None:
-            x.Y_frf_cache = self.compute_FRF(x.omega)
-        return x.Y_frf_cache
-
-    def interpolate_FRF(self, omega) -> array:
-        omega = np.asarray(omega)
-        if np.any((omega < self.omega_frf[0]) | (omega > self.omega_frf[-1])):
-            out_of_range = omega[(omega < self.omega_frf[0]) | (omega > self.omega_frf[-1])]
-            import warnings
-            warnings.warn(
-                f"Some omega values outside FRF data range [{self.omega_frf[0]:.4f}, {self.omega_frf[-1]:.4f}]. Extrapolating for {out_of_range}.")
-        return self.interp_real(omega) + 1j * self.interp_imag(omega)
-
     # def interpolate_FRF(self, omega) -> array:
     #     omega = np.asarray(omega)
-    #     neg_mask = omega < 0
-    #     omega_abs = np.abs(omega)
-    #
-    #     if np.any(omega_abs > self.omega_frf[-1]):
+    #     if np.any((omega < self.omega_frf[0]) | (omega > self.omega_frf[-1])):
+    #         out_of_range = omega[(omega < self.omega_frf[0]) | (omega > self.omega_frf[-1])]
     #         import warnings
-    #         warnings.warn(f"Some omega values outside FRF data range [0, {self.omega_frf[-1]:.4f}]. Extrapolating.")
+    #         warnings.warn(
+    #             f"Some omega values outside FRF data range [{self.omega_frf[0]:.4f}, {self.omega_frf[-1]:.4f}]. Extrapolating for {out_of_range}.")
+    #     return self.interp_real(omega) + 1j * self.interp_imag(omega)
     #
-    #     result = self.interp_real(omega_abs) + 1j * self.interp_imag(omega_abs)
-    #
-    #     # Y(-ω) = conj(Y(ω)) for real systems
-    #     if np.ndim(omega) == 0:
-    #         if bool(neg_mask):
-    #             result = np.conj(result)
-    #     elif np.any(neg_mask):
-    #         result[neg_mask] = np.conj(result[neg_mask])
-    #
-    #     return result
-
-    def compute_FRF_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
-        omega = x.omega
-        if omega < self.omega_frf[0]+self.fd_step:
-            dY = (self.compute_FRF(omega + self.fd_step) - self.get_FRF(x)) / (self.fd_step)
-        else:
-            dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)
-        return self.FRF_to_RI(dY)
-
-    # def compute_FRF_derivative_wrt_omega_RI(self, omega: float) -> array:
-    #     dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)
+    # def compute_FRF_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+    #     omega = x.omega
+    #     if omega < self.omega_frf[0]+self.fd_step:
+    #         dY = (self.compute_FRF(omega + self.fd_step) - self.get_FRF(x)) / (self.fd_step)
+    #     else:
+    #         dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)
     #     return self.FRF_to_RI(dY)
 
 
+    def interpolate_FRF(self, omega) -> array:
+        omega = np.asarray(omega)
+        neg_mask = omega < 0
+        omega_abs = np.abs(omega)
+
+        if np.any(omega_abs > self.omega_frf[-1]):
+            import warnings
+            warnings.warn(f"Some omega values outside FRF data range [0, {self.omega_frf[-1]:.4f}]. Extrapolating.")
+
+        result = self.interp_real(omega_abs) + 1j * self.interp_imag(omega_abs)
+
+        # Y(-ω) = conj(Y(ω)) for real systems
+        if np.ndim(omega) == 0:
+            if bool(neg_mask):
+                result = np.conj(result)
+        elif np.any(neg_mask):
+            result[neg_mask] = np.conj(result[neg_mask])
+
+        return result
+
+    def compute_FRF_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        omega = x.omega
+        dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)
+        return self.FRF_to_RI(dY)
+
+
+class FrequencyDomainFRF_numerical(FrequencyDomainFRF):
+    def compute_FRF(self, omega):
+        d = self.ode.dimension
+        M, C, K = self.ode.mass_matrix, self.ode.damping_matrix, self.ode.stiffness_matrix
+        Y = zeros((self.complex_dimension, self.complex_dimension), dtype=complex)
+        for k, n in enumerate(Fourier.harmonics):
+            Z_n = -(n * omega) ** 2 * M + 1j * n * omega * C + K
+            Y[k * d:(k + 1) * d, k * d:(k + 1) * d] = np.linalg.solve(Z_n, eye(d))
+        return Y
+
+    def compute_FRF_derivative_wrt_omega_RI(self, x):
+        # dY/dω = -Y (dZ/dω) Y,  where dZ/dω = -2n²ω M + jn C
+        omega = x.omega
+        M, C = self.ode.mass_matrix, self.ode.damping_matrix
+        d = self.ode.dimension
+        Y_full = self.get_FRF(x)
+        dY = zeros((self.complex_dimension, self.complex_dimension), dtype=complex)
+        for k, n in enumerate(Fourier.harmonics):
+            Y_n  = Y_full[k*d:(k+1)*d, k*d:(k+1)*d]
+            dZ_n = -2 * n**2 * omega * M + 1j * n * C
+            dY[k*d:(k+1)*d, k*d:(k+1)*d] = - Y_n @ dZ_n @ Y_n
+        return self.FRF_to_RI(dY)
 
 

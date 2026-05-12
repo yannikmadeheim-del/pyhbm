@@ -17,6 +17,8 @@ from .frequency_domain import (
     FrequencyDomainFirstOrderODE_Real,
     FrequencyDomainFirstOrderODE_Complex,
     FrequencyDomainFRF,
+    FrequencyDomainFRF_experimental,
+    FrequencyDomainFRF_numerical
 )
 
 from .numerical_continuation.corrector_step import (
@@ -71,6 +73,8 @@ __all__ = [
     "FrequencyDomainFirstOrderODE_Real",
     "FrequencyDomainFirstOrderODE_Complex",
     "FrequencyDomainFRF",
+    "FrequencyDomainFRF_experimental",
+    "FrequencyDomainFRF_numerical",
     "NewtonRaphson",
     "CorrectorParameterization",
     "OrthogonalParameterization",
