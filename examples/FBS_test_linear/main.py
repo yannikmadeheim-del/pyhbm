@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
-d, k, P = 0.05, 200.0, 1.0
+d, k, P = 0.5, 1.0, 1.0
 harmonics = [1, 3, 5, 7, 9]
 
 # --- System instances ---
@@ -22,7 +22,7 @@ HarmonicBalanceMethod.update_dependencies(harmonics, fbs_numerical.polynomial_de
 
 # --- Shared solver settings ---
 solver_kwargs = {"maximum_iterations": 200, "absolute_tolerance": P * 1e-6}
-step_kwargs   = {"base": 2, "initial_step_length": 0.01, "maximum_step_length": 0.01,
+step_kwargs   = {"base": 2, "initial_step_length": 0.01, "maximum_step_length": 0.1,
                  "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
 angular_frequency_range = [0.5, 20.0]
 
@@ -102,19 +102,41 @@ full_resp_fbs_exp = [fbs_exp_ode.compute_full_response(f, w)
 def norm_dof(fourier_list, dof=0):
     return [np.linalg.norm(f.coefficients[:, dof, 0]) for f in fourier_list]
 
-# --- Plot: DOF 0 (excited DOF, subsystem A) ---
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+# --- Plot ---
+solvers = [
+    (solution_ref.omega,     solution_ref.fourier,     None,               'Reference 2nd order', 'C0', '-'),
+    (solution_ref_frf.omega, solution_ref_frf.fourier, None,               'Reference FRF',       'C1', (0, (5, 1))),
+    (solution_fbs_num.omega, None,                     full_resp_fbs_num,  'FBS numerical',       'C2', '--'),
+    (solution_fbs_exp.omega, None,                     full_resp_fbs_exp,  'FBS experimental',    'C3', ':'),
+]
+
+dofs = [0, 4]
+dof_labels = ['DOF 0 (Subsystem A, excited)', 'DOF 4 (Subsystem B)']
+
+fig = plt.figure(figsize=(14, 10))
+gs = fig.add_gridspec(3, 4, hspace=0.45, wspace=0.35)
 fig.suptitle('FBS vs Reference — Linear 8-DOF System')
 
-for ax, dof in zip(axes, [0, 4]):
-    ax.plot(solution_ref.omega,     norm_dof(solution_ref.fourier, dof),     label='Reference 2nd order', linewidth=2)
-    ax.plot(solution_ref_frf.omega, norm_dof(solution_ref_frf.fourier, dof), label='Reference FRF',       linewidth=2, linestyle=(0, (5, 1)))
-    ax.plot(solution_fbs_num.omega, norm_dof(full_resp_fbs_num, dof),        label='FBS numerical',       linestyle='--')
-    ax.plot(solution_fbs_exp.omega, norm_dof(full_resp_fbs_exp, dof),        label='FBS experimental',    linestyle=':')
+# --- Top row: comparison for DOF 0 and DOF 4 ---
+for col, (dof, dof_label) in enumerate(zip(dofs, dof_labels)):
+    ax = fig.add_subplot(gs[0, col*2 : col*2+2])
+    for omegas, fourier_list, full_list, label, color, ls in solvers:
+        data = fourier_list if full_list is None else full_list
+        ax.plot(omegas, norm_dof(data, dof), label=label, color=color, linestyle=ls)
     ax.set_xlabel('ω')
     ax.set_ylabel('||Q||')
-    ax.set_title(f'DOF {dof} ({"Subsystem A" if dof < 4 else "Subsystem B"})')
-    ax.legend()
+    ax.set_title(dof_label)
+    ax.legend(fontsize=8)
+
+# --- Bottom two rows: individual subplots per solver ---
+for i, (omegas, fourier_list, full_list, label, color, ls) in enumerate(solvers):
+    for j, dof in enumerate(dofs):
+        ax = fig.add_subplot(gs[1 + j, i])
+        data = fourier_list if full_list is None else full_list
+        ax.plot(omegas, norm_dof(data, dof), color=color, linestyle=ls)
+        ax.set_xlabel('ω')
+        ax.set_ylabel('||Q||')
+        ax.set_title(f'{label}\nDOF {dof}', fontsize=8)
 
 plt.tight_layout()
 plt.show()
