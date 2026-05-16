@@ -78,6 +78,20 @@ solution_ref = ref_solver.solve_and_continue(
 )
 print(f"Time Reference:        {time() - t2:.3f} s")
 
+# --- Reference FRF numerical: avoids singular Jacobian at resonances ---
+t3 = time()
+ref_frf_ode    = FrequencyDomainFRF_numerical(reference)
+ref_frf_solver = HarmonicBalanceMethod(harmonics=harmonics, freq_domain_ode=ref_frf_ode)
+solution_ref_frf = ref_frf_solver.solve_and_continue(
+    initial_guess=initial_guess_ref,
+    initial_reference_direction=initial_dir_ref,
+    maximum_number_of_solutions=6000,
+    angular_frequency_range=angular_frequency_range,
+    solver_kwargs=solver_kwargs,
+    step_length_adaptation_kwargs=step_kwargs,
+)
+print(f"Time Reference FRF:    {time() - t3:.3f} s")
+
 # --- Post-processing: reconstruct full DOF response from FBS solution ---
 full_resp_fbs_num = [fbs_num_ode.compute_full_response(f, w)
                      for f, w in zip(solution_fbs_num.fourier, solution_fbs_num.omega)]
@@ -93,9 +107,10 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 fig.suptitle('FBS vs Reference — Linear 8-DOF System')
 
 for ax, dof in zip(axes, [0, 4]):
-    ax.plot(solution_ref.omega,    norm_dof(solution_ref.fourier, dof),    label='Reference',        linewidth=2)
-    ax.plot(solution_fbs_num.omega, norm_dof(full_resp_fbs_num, dof),      label='FBS numerical',    linestyle='--')
-    ax.plot(solution_fbs_exp.omega, norm_dof(full_resp_fbs_exp, dof),      label='FBS experimental', linestyle=':')
+    ax.plot(solution_ref.omega,     norm_dof(solution_ref.fourier, dof),     label='Reference 2nd order', linewidth=2)
+    ax.plot(solution_ref_frf.omega, norm_dof(solution_ref_frf.fourier, dof), label='Reference FRF',       linewidth=2, linestyle=(0, (5, 1)))
+    ax.plot(solution_fbs_num.omega, norm_dof(full_resp_fbs_num, dof),        label='FBS numerical',       linestyle='--')
+    ax.plot(solution_fbs_exp.omega, norm_dof(full_resp_fbs_exp, dof),        label='FBS experimental',    linestyle=':')
     ax.set_xlabel('ω')
     ax.set_ylabel('||Q||')
     ax.set_title(f'DOF {dof} ({"Subsystem A" if dof < 4 else "Subsystem B"})')
