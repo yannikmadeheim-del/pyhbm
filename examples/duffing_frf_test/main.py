@@ -9,8 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
-c, k, beta, P = 0.009, 1.0, 1.0, 1.0
-harmonics = [1, 3, 5, 7]
+c, k, beta, P, ome_dens = 0.09, 1.0, 1.0, 1.0, 1000
+harmonics = [1, 3, 5, 7, 9]
 
 duffing = DuffingForced_SecondOrder(c=c, k=k, beta=beta, P=P)
 duffing_1st = DuffingForced(c=c, k=k, beta=beta, P=P)
@@ -19,7 +19,7 @@ duffing_1st = DuffingForced(c=c, k=k, beta=beta, P=P)
 HarmonicBalanceMethod.update_dependencies(harmonics, duffing.polynomial_degree)
 
 # --- Analytische FRF: Y(ω) = 1 / (k - ω^2 + j*c*ω), shape (N_freq, 1, 1) ---
-omega_frf = np.linspace(0.00, 15.0*np.max(harmonics), 50000)
+omega_frf = np.linspace(0.00, 15.0*np.max(harmonics)*2, ome_dens*15*np.max(harmonics)*2)
 Y_frf = (1.0 / (k - omega_frf**2 + 1j * c * omega_frf))[:, np.newaxis, np.newaxis]
 
 # --- FrequencyDomainFRF aufbauen ---

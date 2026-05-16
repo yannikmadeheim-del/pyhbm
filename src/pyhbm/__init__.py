@@ -2,6 +2,8 @@ __version__ = "2.0"
 
 from .dynamical_system import (
     FirstOrderODE,
+    SecondOrderODE,
+    FBS_System,
 )
 
 from .frequency_domain import (
@@ -18,7 +20,10 @@ from .frequency_domain import (
     FrequencyDomainFirstOrderODE_Complex,
     FrequencyDomainFRF,
     FrequencyDomainFRF_experimental,
-    FrequencyDomainFRF_numerical
+    FrequencyDomainFRF_numerical,
+    FrequencyBasedSubstructuring,
+    FrequencyBasedSubstructuring_numerical,
+    FrequencyBasedSubstructuring_experimental,
 )
 
 from .numerical_continuation.corrector_step import (
@@ -72,9 +77,14 @@ __all__ = [
     "FrequencyDomainFirstOrderODE",
     "FrequencyDomainFirstOrderODE_Real",
     "FrequencyDomainFirstOrderODE_Complex",
+    "SecondOrderODE",
+    "FBS_System",
     "FrequencyDomainFRF",
     "FrequencyDomainFRF_experimental",
     "FrequencyDomainFRF_numerical",
+    "FrequencyBasedSubstructuring",
+    "FrequencyBasedSubstructuring_numerical",
+    "FrequencyBasedSubstructuring_experimental",
     "NewtonRaphson",
     "CorrectorParameterization",
     "OrthogonalParameterization",
