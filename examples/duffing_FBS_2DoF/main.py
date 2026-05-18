@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from time import time
 
-c1, c2, k1, k2, k3, beta, alpha, P = 0.09, 0.09, 1.0, 1.0, 0.0, 1.0, 0.1, 1.0
+c1, c2, k1, k2, k3, beta, alpha, P = 0.09, 0.09, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0
 harmonics = [1, 3, 5, 7, 9]
 
 # --- System instances ---
@@ -185,21 +185,21 @@ for j, dof_label in enumerate(dof_labels):
         ax.set_title(f'{label}\n{dof_label}', fontsize=8)
 
 # --- Row 3: amplitude-parametrized relative error ---
-err_data = [
-    (amp_err_num_d1, eps_num_d1, amp_err_exp_d1, eps_exp_d1, 'DOF 1 (excited)'),
-    (amp_err_num_d2, eps_num_d2, amp_err_exp_d2, eps_exp_d2, 'DOF 2'),
-]
-for col, (amp_n, eps_n, amp_e, eps_e, dof_label) in enumerate(err_data):
-    ax = fig.add_subplot(gs[3, col * 3: col * 3 + 3])
-    lbl_n = f'FBS numerical    $\\varepsilon_{{rel}}^{{max}}$ = {eps_n.max():.2e}' if len(eps_n) > 0 else 'FBS numerical (no solution)'
-    lbl_e = f'FBS experimental $\\varepsilon_{{rel}}^{{max}}$ = {eps_e.max():.2e}' if len(eps_e) > 0 else 'FBS experimental (no solution)'
-    if len(eps_n) > 0:
-        ax.semilogy(amp_n, eps_n, color='C1', linestyle='--', label=lbl_n)
-    if len(eps_e) > 0:
-        ax.semilogy(amp_e, eps_e, color='C2', linestyle=':', label=lbl_e)
-    ax.set_xlabel('||Q||')
-    ax.set_ylabel('$\\varepsilon_{rel}$')
-    ax.set_title(f'Relative error vs amplitude — {dof_label}', fontsize=9)
-    ax.legend(fontsize=7)
+# err_data = [
+#     (amp_err_num_d1, eps_num_d1, amp_err_exp_d1, eps_exp_d1, 'DOF 1 (excited)'),
+#     (amp_err_num_d2, eps_num_d2, amp_err_exp_d2, eps_exp_d2, 'DOF 2'),
+# ]
+# for col, (amp_n, eps_n, amp_e, eps_e, dof_label) in enumerate(err_data):
+#     ax = fig.add_subplot(gs[3, col * 3: col * 3 + 3])
+#     lbl_n = f'FBS numerical    $\\varepsilon_{{rel}}^{{max}}$ = {eps_n.max():.2e}' if len(eps_n) > 0 else 'FBS numerical (no solution)'
+#     lbl_e = f'FBS experimental $\\varepsilon_{{rel}}^{{max}}$ = {eps_e.max():.2e}' if len(eps_e) > 0 else 'FBS experimental (no solution)'
+#     if len(eps_n) > 0:
+#         ax.semilogy(amp_n, eps_n, color='C1', linestyle='--', label=lbl_n)
+#     if len(eps_e) > 0:
+#         ax.semilogy(amp_e, eps_e, color='C2', linestyle=':', label=lbl_e)
+#     ax.set_xlabel('||Q||')
+#     ax.set_ylabel('$\\varepsilon_{rel}$')
+#     ax.set_title(f'Relative error vs amplitude — {dof_label}', fontsize=9)
+#     ax.legend(fontsize=7)
 
 plt.show()
