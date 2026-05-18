@@ -48,8 +48,7 @@ for c in clist:
         isola_init_omega = solution_set.omega[point]
         isola_init_fourier = solution_set.fourier[point]
 
-    solution_set.plot_FRF(degrees_of_freedom=0, show=False)
-    solution_set.save("examples/2dof_duffing/data_frequency_response_curves/frf_2dof_duffing_c=%.4f.mat" % c, MATLAB_compatible=True)
+    plot_FRF(solution_set, degrees_of_freedom=0, show=False)
     
     if c == clist[-1]:
         initial_reference_direction = FourierOmegaPoint(fourier=isola_init_fourier, omega=1)
@@ -70,8 +69,7 @@ for c in clist:
                 "goal_number_of_iterations": 3
             }
         )
-        solution_set.plot_FRF(degrees_of_freedom=0, show=False)
-        solution_set.save("examples/2dof_duffing/data_frequency_response_curves/frf_2dof_duffing_c=%.4f_isola.mat" % c, MATLAB_compatible=True)
+        plot_FRF(solution_set, degrees_of_freedom=0, show=False)
 
 
 plt.show()

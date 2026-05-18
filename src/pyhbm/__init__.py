@@ -97,6 +97,8 @@ __all__ = [
     "BiExponentialAdaptation",
     "SolutionSet",
     "HarmonicBalanceMethod",
+    "plot_FRF",
+    "save_solution_set",
     "TimeDomainValidator",
     "ValidationResult",
     "FloquetAnalyzer",
