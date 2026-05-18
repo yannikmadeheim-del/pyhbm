@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
-d, k, P = 0.5, 1.0, 1.0
+d, k, P = 0.9, 1.0, 1.0
 harmonics = [1, 3, 5, 7, 9]
 
 # --- System instances ---
@@ -22,20 +22,20 @@ HarmonicBalanceMethod.update_dependencies(harmonics, fbs_numerical.polynomial_de
 
 # --- Shared solver settings ---
 solver_kwargs = {"maximum_iterations": 200, "absolute_tolerance": P * 1e-6}
-step_kwargs   = {"base": 2, "initial_step_length": 0.01, "maximum_step_length": 0.1,
+step_kwargs   = {"base": 2, "initial_step_length": 0.01, "maximum_step_length": 0.5,
                  "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
-angular_frequency_range = [0.5, 20.0]
+angular_frequency_range = [0.1, 2.5]
 
 # Start at omega > 0: subsystem K is free-free (singular at omega=0)
-initial_omega = 0.5
+initial_omega = 2.5
 
 # Initial conditions for FBS (n_int = 3 DOFs)
 initial_guess_fbs = FourierOmegaPoint.zero_amplitude(dimension=fbs_numerical.dimension, omega=initial_omega)
-initial_dir_fbs   = FourierOmegaPoint.zero_amplitude(dimension=fbs_numerical.dimension, omega=1.0)
+initial_dir_fbs   = FourierOmegaPoint.zero_amplitude(dimension=fbs_numerical.dimension, omega=-1.0)
 
 # Initial conditions for reference (8 DOFs)
 initial_guess_ref = FourierOmegaPoint.zero_amplitude(dimension=reference.dimension, omega=initial_omega)
-initial_dir_ref   = FourierOmegaPoint.zero_amplitude(dimension=reference.dimension, omega=1.0)
+initial_dir_ref   = FourierOmegaPoint.zero_amplitude(dimension=reference.dimension, omega=-1.0)
 
 # --- FBS numerical ---
 t0 = time()
@@ -138,5 +138,4 @@ for i, (omegas, fourier_list, full_list, label, color, ls) in enumerate(solvers)
         ax.set_ylabel('||Q||')
         ax.set_title(f'{label}\nDOF {dof}', fontsize=8)
 
-plt.tight_layout()
 plt.show()

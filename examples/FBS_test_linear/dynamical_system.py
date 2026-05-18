@@ -124,8 +124,8 @@ class linearFBS_System_experimental(linearFBS_System_numerical):
 		super().__init__(d,k,P)
 		f_start = 0.01
 		f_end = 20.0
-		f_density = .01
-		freq = np.linspace(f_start, f_end, int((f_end - f_start) / f_density))
+		f_density = 1000
+		freq = np.linspace(f_start, f_end, int((f_end - f_start) * f_density))
 		ome = 2 * np.pi * freq
 		Y_A_B = np.zeros((ome.shape[0], self.mass_matrix.shape[0], self.mass_matrix.shape[0]), dtype=complex)
 		for i, w in enumerate(ome):

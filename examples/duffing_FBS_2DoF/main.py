@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
-c1, c2, k1, k2, k3, beta, alpha, P = 0.09, 0.09, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0
+c1, c2, k1, k2, k3, beta, alpha, P = 0.09, 0.09, 1.0, 1.0, 0.0, 0.0, 0.9, 1.0
 harmonics = [1, 3, 5, 7, 9]
 
 # --- System instances ---
@@ -26,7 +26,7 @@ step_kwargs_FBS   = {"base": 2, "initial_step_length": 0.01, "maximum_step_lengt
                  "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
 step_kwargs   = {"base": 2, "initial_step_length": 0.01, "maximum_step_length": 5.0,
                  "minimum_step_length": 5e-6, "goal_number_of_iterations": 3}
-angular_frequency_range = [0.0, 15.0]
+angular_frequency_range = [0.0, 5.0]
 initial_omega = 0.0
 
 # FBS unknowns: u_rel (dimension = 1)
