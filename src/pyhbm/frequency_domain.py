@@ -571,7 +571,7 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
         Y = self.get_FRF(x)
         Fnl = vstack(nonlinear_term.coefficients)
         Fext = vstack(self.external_term.coefficients)
-        R = Q - Y@Fext + Y@Fnl   # R = Q + Y @ Fnl - Y @ Fext
+        R = Q + Y @ (Fnl - Fext)   # R = Q + Y @ Fnl - Y @ Fext
         return vstack((R.real, R.imag))
 
     def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
@@ -718,7 +718,7 @@ class FrequencyBasedSubstructuring(FrequencyDomainFRF):
         Q_rel = vstack(state.coefficients)
         Fnl = vstack(nonlinear_term.coefficients)
         BY = self.get_BY(x)
-        R = (Q_rel - BY @ self.F_ext_full + BY @ self.B_fourier.T @ Fnl)  # R = Q_rel - B*Y*Fext + B*Y*B^T*Fnl
+        R = Q_rel + BY @ (self.B_fourier.T @ Fnl - self.F_ext_full) # R = Q_rel - B*Y*Fext + B*Y*B^T*Fnl
         return vstack((R.real, R.imag))
 
     def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
@@ -738,7 +738,7 @@ class FrequencyBasedSubstructuring(FrequencyDomainFRF):
         derivative_nonlinear_RI = vstack((Gdot.RR @ qdot_R + Gdot.RI @ qdot_I,
                                           Gdot.IR @ qdot_R + Gdot.II @ qdot_I))  # dF_nl/dω = G_dot @ q_dot_adim
         BdY = self.B_RI @ dY_RI
-        return BdY @ self.B_RI.T @ Fnl + self.get_BYBT_RI(x) @ derivative_nonlinear_RI - BdY @ self.F_ext_full_RI  # dR/dω = dY/dω @ Fnl + Y @ dF_nl/dω - dY/dω @ Fext
+        return BdY @ (self.B_RI.T @ Fnl - self.F_ext_full_RI) + self.get_BYBT_RI(x) @ derivative_nonlinear_RI   # dR/dω = dY/dω @ Fnl + Y @ dF_nl/dω - dY/dω @ Fext
 
     def get_FRF(self, x):
         if x.Y_frf_cache is None:

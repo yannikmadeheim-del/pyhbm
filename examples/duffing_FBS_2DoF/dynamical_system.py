@@ -37,7 +37,7 @@ class System2DoF_1stOrder(FirstOrderODE):
     """
     is_real_valued = True
 
-    def __init__(self, c1=0.01, c2=0.01, k1=1.0, k2=1.0, k3=1.0, beta=1.0, alpha=0.1, P=20.0):
+    def __init__(self, c1=0.01, c2=0.01, k1=1.0, k2=1.0, k3=0.0, beta=1.0, alpha=0.0, P=1.0):
         """
         Initializes the Duffing oscillator parameters.
 
@@ -179,7 +179,7 @@ class System2DoF_FBS(FBS_System):
 
     is_real_valued = True
 
-    def __init__(self, c1=0.01, c2=0.01, k1=1.0, k2=1.0, k3=1.0, beta=1.0, alpha=0.1, P=1.0):
+    def __init__(self, c1=0.01, c2=0.01, k1=1.0, k2=1.0, k3=0.0, beta=1.0, alpha=0.0, P=1.0):
         """
 		Initializes the linear FBS system.
 
@@ -244,12 +244,12 @@ class System2DoF_FBS_experimental(System2DoF_FBS):
     for interpolation inside FrequencyBasedSubstructuring_experimental.
     """
 
-    def __init__(self, c1=0.01, c2=0.01, k1=1.0, k2=1.0, beta=1.0, P=1.0):
-        super().__init__(c1=c1, c2=c2, k1=k1, k2=k2, beta=beta, P=P)
+    def __init__(self, c1=0.01, c2=0.01, k1=1.0, k2=1.0, k3=0.0, beta=1.0, alpha=0.0, P=1.0):
+        super().__init__(c1=c1, c2=c2, k1=k1, k2=k2, k3=k3, beta=beta, alpha=alpha, P=P)
         omega_start = 0.00
-        omega_end = 15.0*9*2
-        ome_density = 1000.0
-        n_points = int((omega_end - omega_start) * ome_density)  # 100 points per rad/s
+        omega_end = 5.0*9*2
+        ome_density = 1000.0 # points per rad/s
+        n_points = int((omega_end - omega_start) * ome_density)
         omega_frf = np.linspace(omega_start, omega_end, n_points)
         Y_frf = np.zeros((n_points, self.total_dimension, self.total_dimension), dtype=complex)
         for i, w in enumerate(omega_frf):
