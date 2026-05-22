@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python main.py)",
       "Bash(python:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

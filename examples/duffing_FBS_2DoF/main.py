@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from time import time
 
-c1, c2, k1, k2, k3, beta, alpha, P = 0.09, 0.09, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0
+c1, c2, k1, k2, k3, beta, alpha, P = 0.09, 0.09, 1.0, 1.0, 0.0, 1.0, 0.1, 1.0
 harmonics = [1, 3, 5, 7, 9]
 
 # --- System instances ---
@@ -160,12 +160,12 @@ solvers = [
 dof_labels = ['DOF 1 (excited)', 'DOF 2']
 
 fig = plt.figure(figsize=(14, 13))
-gs = fig.add_gridspec(4, 6, hspace=0.55, wspace=0.35)
-fig.suptitle('FBS vs Reference — Nonlinear 2-DOF Duffing')
+gs = fig.add_gridspec(4, 12, hspace=0.55, wspace=0.35)
+fig.suptitle('FBS vs Reference — 2-DOF with cubic spring and cubic damping')
 
 # --- Row 0: comparison per DOF (each spanning 3 columns) ---
 for col, dof_label in enumerate(dof_labels):
-    ax = fig.add_subplot(gs[0, col * 3: col * 3 + 3])
+    ax = fig.add_subplot(gs[0, col * 6: col * 6 + 5])
     for omegas, fourier_list, full_list, label, color, ls, dofs in solvers:
         data = fourier_list if full_list is None else full_list
         ax.plot(omegas, norm_dof(data, dofs[col]), label=label, color=color, linestyle=ls)
@@ -177,7 +177,7 @@ for col, dof_label in enumerate(dof_labels):
 # --- Rows 1–2: individual subplots per solver (3 cols), one row per DOF ---
 for j, dof_label in enumerate(dof_labels):
     for i, (omegas, fourier_list, full_list, label, color, ls, dofs) in enumerate(solvers):
-        ax = fig.add_subplot(gs[1 + j, i * 2: i * 2 + 2])
+        ax = fig.add_subplot(gs[1 + j, i * 4: i * 4 + 3])
         data = fourier_list if full_list is None else full_list
         ax.plot(omegas, norm_dof(data, dofs[j]), color=color, linestyle=ls)
         ax.set_xlabel('ω')

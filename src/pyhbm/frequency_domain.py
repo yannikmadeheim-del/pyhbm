@@ -155,6 +155,10 @@ class FourierOmegaPoint(object):
         self.nonlinear_term_cache = None
         self.BY_cache = None        # B_fourier @ Y  (complex, reused by residue + Jacobian)
         self.BYBT_RI_cache = None   # FRF_to_RI(B @ Y @ B.T)  (reused by Jacobian + dR/dω)
+        self.Yr_cache = None # complex Y_r = B @ Y @ B^T
+        self.Zr_rhs = None # solve(Y_r, F_adm − Q_rel)
+        self.lambda_corrected = None # corrected λ̃
+        self.contact_mask = None # uncorrected lambda prediciton time series
         
     @staticmethod
     def new_from_RI_omega(RI_omega: array):
@@ -850,3 +854,82 @@ class FrequencyBasedSubstructuring_experimental(FrequencyBasedSubstructuring):
         omega = x.omega
         dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)
         return self.FRF_to_RI(dY)
+
+class FBS_DLFT(FrequencyBasedSubstructuring):
+    def __init__(self, fbs_system: FBS_System, epsilon = 1.0, g_zero = 0.0, h=1e-6):
+        super().__init__(fbs_system)
+        self.epsilon = epsilon
+        self.g_zero = g_zero
+        self.complex_int_dimension = Fourier.number_of_harmonics*self.ode.dimension
+        self.h = h
+
+    def _get_Yr(self, x):
+        if x.Yr_cache is None:
+            x.Yr_cache = self.get_BY(x) @ self.B_fourier.T # B * Y_A|B * B.T
+        return x.Yr_cache
+
+    def _get_Fext_admr(self, x):
+        F_admr = self.get_BY(x) @ self.F_ext_full # complex free admittance response to excitation
+        return F_admr # shape (Nh*n_int, 1)
+
+    def _get_Zr_rhs(self, x):
+        if x.Zr_rhs is None:
+            x.Zr_rhs = np.linalg.solve(self._get_Yr(x), self._get_Fext_admr(x)-vstack(x.fourier.coefficients))
+        return x.Zr_rhs
+
+    def _get_lambda_corrected(self, x): # DLFT-AFT loop
+        if x.lambda_corrected is None:
+            zr_fourier = Fourier(self._get_Zr_rhs(x).reshape(Fourier.number_of_harmonics, self.ode.dimension, 1))
+            Fourier_Real.compute_time_series(zr_fourier)
+            zr_t = zr_fourier.time_series  # shape (Nt, n_int, 1)
+            Fourier_Real.compute_time_series(x.fourier)
+            q_rel = x.fourier.time_series
+            lambda_x = zr_t - self.epsilon * (q_rel+self.g_zero)
+            x.contact_mask = lambda_x > 0
+            lambda_t_corr = np.where(x.contact_mask, lambda_x, 0.0) # Correction
+            lambda_x_corr = Fourier_Real.new_from_time_series(lambda_t_corr)
+            x.lambda_corrected = vstack(lambda_x_corr.coefficients)
+        return x.lambda_corrected
+
+    def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
+        Q_rel = vstack(x.fourier.coefficients)
+        R = Q_rel + self._get_Yr(x) @ self._get_lambda_corrected(x) - self._get_Fext_admr(x)
+        return vstack((R.real, R.imag))
+
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        self._get_lambda_corrected(x)
+        dlambda_x = np.linalg.solve(self._get_Yr(x), -(np.eye( self.complex_int_dimension) + self.epsilon*self._get_Yr(x))) # Prediction Jacobian shape (Nh*n_int, Nh*n_int)
+        dlambda_x_resh = dlambda_x.reshape(Fourier.number_of_harmonics, self.ode.dimension, self.complex_int_dimension) # (Nh, n_int, Nh*n_int)
+        dlambda_x_fourier = Fourier(dlambda_x_resh)
+        Fourier_Real.compute_time_series(dlambda_x_fourier)
+        dlambda_t_corr = np.where(x.contact_mask > 0, dlambda_x_fourier.time_series, 0.0)
+        dlambda_x_corr = Fourier_Real.new_from_time_series(dlambda_t_corr) # (Nh, n_int, Nh*n_int)
+        dlambda_x_corr_matrix = vstack(dlambda_x_corr.coefficients) # (Nh*n_int, Nh*n_int)
+        J_complex = eye(self.complex_int_dimension) + self._get_Yr(x) @ dlambda_x_corr_matrix
+        return self.FRF_to_RI(J_complex)
+
+    def _get_dY_complex(self, x) -> array:
+        return (self.compute_FRF(x.omega + self.h) - self.compute_FRF(x.omega - self.h)) / (2 * self.h)
+
+    def _get_dY_RI(self, x):
+        return self.FRF_to_RI(self._get_dY_complex(x))
+
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        dY_complex = self._get_dY_complex(x)
+        BdY = self.B_fourier @ dY_complex
+        lambda_corrected = self._get_lambda_corrected(x)
+        Zr_rhs = self._get_Zr_rhs(x)
+        dY_term = BdY @ (self.B_fourier.T @ lambda_corrected - self.F_ext_full) # B*dY/dw*(B^T*lamda - Fext)
+        dlambda_pred = np.linalg.solve(self._get_Yr(x), BdY @ (self.F_ext_full - self.B_fourier.T @ Zr_rhs))
+        dlambda_pred_resh = dlambda_pred.reshape(Fourier.number_of_harmonics, self.ode.dimension, 1)  # (Nh, n_int, 1)
+        dlambda_pred_fourier = Fourier(dlambda_pred_resh)
+        Fourier_Real.compute_time_series(dlambda_pred_fourier)
+        dlambda_t_corr = np.where(x.contact_mask > 0, dlambda_pred_fourier.time_series, 0.0)
+        dlambda_x_corr = Fourier_Real.new_from_time_series(dlambda_t_corr)
+        dlambda_x_corr_vector = vstack(dlambda_x_corr.coefficients)
+        dH= dY_term + self._get_Yr(x) @ dlambda_x_corr_vector
+        return vstack((dH.real, dH.imag))
+
+class FBS_DLFT_numerical(FBS_DLFT, FrequencyBasedSubstructuring_numerical):
+    pass
+
