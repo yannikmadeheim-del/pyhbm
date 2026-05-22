@@ -930,6 +930,14 @@ class FBS_DLFT(FrequencyBasedSubstructuring):
         dH= dY_term + self._get_Yr(x) @ dlambda_x_corr_vector
         return vstack((dH.real, dH.imag))
 
+    def compute_full_response(self, fourier: Fourier, omega: float) -> Fourier:
+        x = FourierOmegaPoint(fourier, omega)
+        lambda_tilde = self._get_lambda_corrected(x)
+        Y = self.get_FRF(x)
+        Q_full = Y @ (self.F_ext_full - self.B_fourier.T @ lambda_tilde)
+        coefficients = Q_full.reshape(Fourier.number_of_harmonics, self.d_total, 1)
+        return Fourier(coefficients)
+
 class FBS_DLFT_numerical(FBS_DLFT, FrequencyBasedSubstructuring_numerical):
     pass
 

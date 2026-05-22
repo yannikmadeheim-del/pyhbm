@@ -75,7 +75,6 @@ class HarmonicBalanceMethod:
 		self.solver = corrector_solver
 		self.corrector_parameterization = corrector_parameterization
 		self.predictor = predictor
-   
 		self.step_length_adaptation = step_length_adaptation
 
 		self.reference_force_level = norm(self.freq_domain_ode.external_term.coefficients)
