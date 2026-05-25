@@ -856,12 +856,58 @@ class FrequencyBasedSubstructuring_experimental(FrequencyBasedSubstructuring):
         return self.FRF_to_RI(dY)
 
 class FBS_DLFT(FrequencyBasedSubstructuring):
-    def __init__(self, fbs_system: FBS_System, epsilon = 1.0, g_zero = 0.0, h=1e-6):
+    r"""
+    Dynamic Lagrangian Frequency-Time (DLFT) contact in *admittance* / FBS form.
+
+    Drop-in alternative to the AFT scheme: same residue/Jacobian interface as
+    ``FrequencyBasedSubstructuring`` so it plugs into the predictor-corrector
+    continuation unchanged. The primary Newton unknown is the multiharmonic
+    relative-displacement vector ``x_r`` (NOT the contact force, which is slaved
+    to ``x_r`` by a prediction-correction at every residue evaluation).
+
+    Master equations (see docs/fbs_dlft_admittance.tex for the full derivation):
+
+        Y_r   = B Y B^T               interface admittance        (Eq. YrFadm)
+        F_adm = B Y f_ext             free relative response      (Eq. YrFadm)
+        residue:  r(x_r) = x_r + Y_r @ lambda(x_r) - F_adm        (Eq. residual)
+
+        prediction (time):  lambda_p = IDFT[Z_r (F_adm - x_r)] + eps (x_r - g0)
+        correction (time):  lambda   = max(0, lambda_p)            (UCC, Eq. corr)
+        re-projection:      lambda~  = DFT[ lambda ]
+
+        Jacobian:  dr/dx_r = I + Y_r @ ( DFT @ diag(mask) @ IDFT @ (eps I - Z_r) )
+                                                                   (Eq. Jfull, A.2-A.4)
+
+    The masked operator ``DFT @ diag(mask) @ IDFT`` is real-linear but NOT
+    complex-holomorphic, so it must NOT be wrapped by ``FRF_to_RI`` (that
+    holomorphic form is only valid in persistent contact, mask == 1). It is
+    applied with *batched* real FFTs in ``_masked_dft_operator``: the columns of
+    the RI prediction Jacobian have complex spectra ``[M, i*M]`` (M = eps*I - Z_r),
+    which are inverse-transformed, masked in time, and forward-transformed in one
+    batched rfft/irfft over the 2*Nh*n_int columns. This avoids forming the dense
+    (Nt*n_int x 2*Nh*n_int) DFT matrices and scales to large interfaces:
+    O(Nh*n_int * Nt log Nt) work and O(Nt*n_int * chunk) memory instead of
+    O((Nh*n_int)^2 * Nt). Z_r = Y_r^-1 is likewise inverted block-by-block.
+
+    :param epsilon: penalty / Lagrangian factor. Must be large enough to detect
+        contact through the penalty: for stiffness ~1 use eps >~ 1e6 (robust at
+        1e8). The converged solution is eps-independent (Vadcard 2022); only the
+        truncation-oscillation floor of the residual grows with eps.
+    :param g_zero: wall offset g0 (contact when x_r > g0).
+    :param h: finite-difference step for dY/domega.
+    :param jacobian_column_chunk: optional column-block size for the batched
+        Jacobian transform (bounds peak memory of the time-domain buffer); None
+        processes all 2*Nh*n_int columns at once.
+    """
+
+    def __init__(self, fbs_system: FBS_System, epsilon=1.0, g_zero=0.0, h=1e-6,
+                 jacobian_column_chunk: int = None):
         super().__init__(fbs_system)
         self.epsilon = epsilon
         self.g_zero = g_zero
-        self.complex_int_dimension = Fourier.number_of_harmonics*self.ode.dimension
+        self.complex_int_dimension = Fourier.number_of_harmonics * self.ode.dimension
         self.h = h
+        self.jacobian_column_chunk = jacobian_column_chunk
 
     def _get_Yr(self, x):
         if x.Yr_cache is None:
@@ -884,7 +930,7 @@ class FBS_DLFT(FrequencyBasedSubstructuring):
             zr_t = zr_fourier.time_series  # shape (Nt, n_int, 1)
             Fourier_Real.compute_time_series(x.fourier)
             q_rel = x.fourier.time_series
-            lambda_x = zr_t - self.epsilon * (q_rel+self.g_zero)
+            lambda_x = zr_t + self.epsilon * (q_rel - self.g_zero)
             x.contact_mask = lambda_x > 0
             lambda_t_corr = np.where(x.contact_mask, lambda_x, 0.0) # Correction
             lambda_x_corr = Fourier_Real.new_from_time_series(lambda_t_corr)
@@ -896,17 +942,61 @@ class FBS_DLFT(FrequencyBasedSubstructuring):
         R = Q_rel + self._get_Yr(x) @ self._get_lambda_corrected(x) - self._get_Fext_admr(x)
         return vstack((R.real, R.imag))
 
+    def _invert_Yr_blockwise(self, Yr: array) -> array:
+        """Z_r = Y_r^{-1}, exploiting that Y_r = B Y B^T is block-diagonal per
+        harmonic (B_fourier = kron(I_Nh, B_coupling) and Y is block-diagonal per
+        harmonic, so each block is n_int x n_int). Costs O(Nh * n_int^3) instead
+        of the dense O((Nh*n_int)^3)."""
+        n = self.ode.dimension
+        Zr = zeros_like(Yr)
+        for k in range(Fourier.number_of_harmonics):
+            s = slice(k * n, (k + 1) * n)
+            Zr[s, s] = np.linalg.solve(Yr[s, s], np.eye(Yr[s,s].shape[0]))
+        return Zr
+
+    def _masked_dft_operator(self, M: array, contact_mask: array) -> array:
+        r"""Real (2*Nhn, 2*Nhn) operator  DFT @ diag(mask) @ IDFT @ FRF_to_RI(M)
+        for a complex-linear M (Nhn x Nhn), via *batched* real FFTs.
+
+        The 2*Nhn columns of FRF_to_RI(M) are the (Re;Im) spectra of real signals;
+        their complex representation is the horizontal stack [M, i*M]. Each column
+        is IDFT'd to time (batched irfft), multiplied by the contact mask, then
+        DFT'd back (batched rfft); real/imag parts are stacked into the RI
+        operator. Mathematically identical to ``Gamma+ @ diag(mask) @ Gamma`` but
+        without the dense DFT matrices.
+        """
+        Nhn = self.complex_int_dimension
+        Nh = Fourier.number_of_harmonics
+        n = self.ode.dimension
+        spectra = hstack((M, 1j * M))                          # (Nhn, 2*Nhn) complex
+        ncols = 2 * Nhn
+        chunk = self.jacobian_column_chunk or ncols
+        operator = zeros((2 * Nhn, ncols))
+        for start in range(0, ncols, chunk):
+            block = spectra[:, start:start + chunk]            # (Nhn, c)
+            freq = Fourier(block.reshape(Nh, n, block.shape[1]))
+            Fourier_Real.compute_time_series(freq)             # (Nt, n, c)
+            masked = contact_mask * freq.time_series           # (Nt, n, 1) * (Nt, n, c)
+            coeffs = Fourier_Real.new_from_time_series(masked).coefficients.reshape(Nhn, -1)
+            operator[:Nhn, start:start + chunk] = coeffs.real
+            operator[Nhn:, start:start + chunk] = coeffs.imag
+        return operator
+
     def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
-        self._get_lambda_corrected(x)
-        dlambda_x = np.linalg.solve(self._get_Yr(x), -(np.eye( self.complex_int_dimension) + self.epsilon*self._get_Yr(x))) # Prediction Jacobian shape (Nh*n_int, Nh*n_int)
-        dlambda_x_resh = dlambda_x.reshape(Fourier.number_of_harmonics, self.ode.dimension, self.complex_int_dimension) # (Nh, n_int, Nh*n_int)
-        dlambda_x_fourier = Fourier(dlambda_x_resh)
-        Fourier_Real.compute_time_series(dlambda_x_fourier)
-        dlambda_t_corr = np.where(x.contact_mask > 0, dlambda_x_fourier.time_series, 0.0)
-        dlambda_x_corr = Fourier_Real.new_from_time_series(dlambda_t_corr) # (Nh, n_int, Nh*n_int)
-        dlambda_x_corr_matrix = vstack(dlambda_x_corr.coefficients) # (Nh*n_int, Nh*n_int)
-        J_complex = eye(self.complex_int_dimension) + self._get_Yr(x) @ dlambda_x_corr_matrix
-        return self.FRF_to_RI(J_complex)
+        r"""Analytic dr/dx_r in RI form (docs/fbs_dlft_admittance.tex, Eq. Jfull):
+
+            dr/dx_r = I + Y_r @ ( DFT @ diag(mask) @ IDFT @ (eps I - Z_r) )
+
+        ``eps I - Z_r`` and ``Y_r`` are complex-linear (-> ``FRF_to_RI``), but the
+        masked time-domain operator is only real-linear and is applied with
+        batched FFTs in ``_masked_dft_operator`` (NOT ``FRF_to_RI`` of a complex
+        matrix). Scales to large interfaces; see the class docstring.
+        """
+        self._get_lambda_corrected(x)                          # populates x.contact_mask
+        Yr = self._get_Yr(x)
+        M = self.epsilon * eye(self.complex_int_dimension) - self._invert_Yr_blockwise(Yr)
+        dlambda_corr_RI = self._masked_dft_operator(M, x.contact_mask)
+        return eye(self.real_dimension) + self.FRF_to_RI(Yr) @ dlambda_corr_RI
 
     def _get_dY_complex(self, x) -> array:
         return (self.compute_FRF(x.omega + self.h) - self.compute_FRF(x.omega - self.h)) / (2 * self.h)

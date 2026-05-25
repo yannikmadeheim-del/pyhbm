@@ -4,7 +4,13 @@
       "Bash(python main.py)",
       "Bash(python:*)",
       "Bash(cp:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(cd \"C:\\\\Users\\\\yanni\\\\Desktop\\\\TUM\\\\Bachelorarbeit\\\\Fast_numerical_solution_for_nonlinear_FE_dynamics\" && python -c \"import pypdf, pikepdf; print\\('pypdf', pypdf.__version__\\); print\\('pikepdf', pikepdf.__version__\\)\" 2>&1 | head -20)",
+      "Bash(pip list *)",
+      "Bash(where python *)",
+      "Bash(py -0p)",
+      "Bash(.venv/Scripts/python.exe -c \"import numpy, scipy, matplotlib; print\\('numpy', numpy.__version__, 'scipy', scipy.__version__\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 timeout 600 .venv/Scripts/python.exe examples/fbs_dnft_unilateral_spring/validation_dlft_vs_aft.py)"
     ]
   }
 }

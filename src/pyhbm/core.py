@@ -186,8 +186,10 @@ class HarmonicBalanceMethod:
     
 				self.parameterization = self.corrector_parameterization(
 					predictor_vector = predictor_vector,
-					predicted_solution = asarray(predicted_solution),
+					predicted_solution = predicted_solution
 				)
+				#step_size = step_length_adaptation.step_length,
+				#last_solution = asarray(previous_solution)
 
 				solution, iterations, success, jacobian = solver.solve(predicted_solution, return_jacobian=True)
 				count_min_step_length += step_length_adaptation.update_step_length(iterations) # do this check before

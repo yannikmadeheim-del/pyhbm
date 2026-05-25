@@ -29,11 +29,11 @@ class dlft_unilateral(FBS_System):
         self.P = P
         self.mass_matrix = np.diag([1, 1])
         self.stiffness_matrix = np.array([[1, -1], [-1, 2]])
-        self.damping_matrix = 0.03*self.stiffness_matrix
+        self.damping_matrix = 0.15*self.stiffness_matrix
         self.B_coupling = np.array([[1, 0]])
         self.total_dimension = self.mass_matrix.shape[0]
         self.dimension = 1
-        self.polynomial_degree = 11
+        self.polynomial_degree = 50
 
     def external_term(self, adimensional_time: np.ndarray) -> np.ndarray:
         """
