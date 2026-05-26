@@ -7,12 +7,13 @@ class TestPackageImports:
 
     def test_import_version(self):
         import pyhbm
-        assert pyhbm.__version__ == "2.0"
+        assert pyhbm.__version__ == "2.1"
 
     def test_import_base_classes(self):
-        from pyhbm import DynamicalSystem, FirstOrderODE
-        assert DynamicalSystem is not None
+        from pyhbm import FirstOrderODE, SecondOrderODE, FBS_System
         assert FirstOrderODE is not None
+        assert SecondOrderODE is not None
+        assert FBS_System is not None
 
     def test_import_fourier_classes(self):
         from pyhbm import (
@@ -46,6 +47,21 @@ class TestPackageImports:
         assert FrequencyDomainFirstOrderODE_Real is not None
         assert FrequencyDomainFirstOrderODE_Complex is not None
 
+    def test_import_new_api(self):
+        from pyhbm import (
+            FRFProvider, NumericalFRF, ExperimentalFRF,
+            NonlinearMethod, AFT, DLFTContact,
+            FRFProblem, FBSProblem,
+        )
+        assert FRFProvider is not None
+        assert NumericalFRF is not None
+        assert ExperimentalFRF is not None
+        assert NonlinearMethod is not None
+        assert AFT is not None
+        assert DLFTContact is not None
+        assert FRFProblem is not None
+        assert FBSProblem is not None
+
     def test_import_numerical_continuation_classes(self):
         from pyhbm import (
             NewtonRaphson,
@@ -68,23 +84,22 @@ class TestPackageImports:
     def test_import_all(self):
         import pyhbm
         assert hasattr(pyhbm, "__version__")
-        assert hasattr(pyhbm, "DynamicalSystem")
         assert hasattr(pyhbm, "FirstOrderODE")
         assert hasattr(pyhbm, "Fourier")
         assert hasattr(pyhbm, "HarmonicBalanceMethod")
 
 
-class TestDynamicalSystemBase:
-    """Test the DynamicalSystem base class."""
+class TestFirstOrderODEBase:
+    """Test the FirstOrderODE base class."""
 
     def test_base_class_has_default_values(self):
-        from pyhbm import DynamicalSystem
+        from pyhbm import FirstOrderODE
 
-        ds = DynamicalSystem()
-        assert ds.dimension == 2
-        assert ds.polynomial_degree == 1
-        assert ds.is_real_valued is True
-        assert ds.linear_coefficient is not None
+        ode = FirstOrderODE()
+        assert ode.dimension == 2
+        assert ode.polynomial_degree == 1
+        assert ode.is_real_valued is True
+        assert ode.linear_coefficient is not None
 
 
 class TestFourierBasics:

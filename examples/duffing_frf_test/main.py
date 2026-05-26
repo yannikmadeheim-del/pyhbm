@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
-c, k, beta, P, ome_dens = 0.09, 1.0, 1.0, 1.0, 1000
+c, k, beta, P, ome_dens = 0.009, 1.0, 1.0, 1.0, 1000
 harmonics = [1, 3, 5, 7, 9]
 
 duffing = DuffingForced_SecondOrder(c=c, k=k, beta=beta, P=P)

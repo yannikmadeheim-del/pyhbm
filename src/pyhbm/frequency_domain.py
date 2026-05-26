@@ -150,12 +150,16 @@ class FourierOmegaPoint(object):
         self.time_series_derivative = None
         self.second_adimensional_time_derivative = None
         self.Gdot = None
-        self.Y_frf_cache = None
-        self.Z_frf_cache = None
+        self.Y_cache = None
+        self.Z_cache = None
         self.nonlinear_term_cache = None
         self.BY_cache = None        # B_fourier @ Y  (complex, reused by residue + Jacobian)
         self.BYBT_RI_cache = None   # FRF_to_RI(B @ Y @ B.T)  (reused by Jacobian + dR/dω)
-        
+        self.Yr_cache = None         # complex Y_r = B @ Y @ B^T
+        self.Zr_rhs = None           # solve(Y_r, F_adm − Q_rel)  (linear/"balancing" multiplier estimate)
+        self.lambda_corrected = None # corrected contact force λ̃ = DFT[max(0, λ_p)]
+        self.contact_mask = None     # time-domain Boolean mask m = (λ_p > 0)
+
     @staticmethod
     def new_from_RI_omega(RI_omega: array):
         # in case omega is not included in the array
@@ -598,9 +602,9 @@ class FrequencyDomainFRF(FrequencyDomainSecondOrderODE_Real):
 
 
     def get_FRF(self, x):
-        if x.Y_frf_cache is None:
-            x.Y_frf_cache = self.compute_FRF(x.omega)
-        return x.Y_frf_cache
+        if x.Y_cache is None:
+            x.Y_cache = self.compute_FRF(x.omega)
+        return x.Y_cache
 
     def compute_FRF(self, omega):
         pass
@@ -741,9 +745,9 @@ class FrequencyBasedSubstructuring(FrequencyDomainFRF):
         return BdY @ (self.B_RI.T @ Fnl - self.F_ext_full_RI) + self.get_BYBT_RI(x) @ derivative_nonlinear_RI   # dR/dω = dY/dω @ Fnl + Y @ dF_nl/dω - dY/dω @ Fext
 
     def get_FRF(self, x):
-        if x.Y_frf_cache is None:
-            x.Y_frf_cache = self.compute_FRF(x.omega)
-        return x.Y_frf_cache
+        if x.Y_cache is None:
+            x.Y_cache = self.compute_FRF(x.omega)
+        return x.Y_cache
 
     def get_BY(self, x: FourierOmegaPoint) -> array:
         if x.BY_cache is None:
@@ -850,3 +854,132 @@ class FrequencyBasedSubstructuring_experimental(FrequencyBasedSubstructuring):
         omega = x.omega
         dY = (self.compute_FRF(omega + self.fd_step) - self.compute_FRF(omega - self.fd_step)) / (2 * self.fd_step)
         return self.FRF_to_RI(dY)
+
+
+class FBS_DLFT(FrequencyBasedSubstructuring):
+    r"""
+    Dynamic Lagrangian Frequency-Time (DLFT) contact in *admittance* / FBS form.
+
+    Drop-in alternative to the AFT scheme: same residue/Jacobian interface as
+    ``FrequencyBasedSubstructuring`` so it plugs into the predictor-corrector
+    continuation unchanged. The primary Newton unknown is the multiharmonic
+    relative-displacement vector ``x_r`` (NOT the contact force, which is slaved
+    to ``x_r`` by a prediction-correction at every residue evaluation).
+
+    Master equations (see docs/fbs_dlft_admittance.tex for the full derivation):
+
+        Y_r   = B Y B^T               interface admittance
+        F_adm = B Y f_ext             free relative response
+        residue:  r(x_r) = x_r + Y_r @ lambda(x_r) - F_adm
+
+        prediction (time):  lambda_p = IDFT[Z_r (F_adm - x_r)] + eps (x_r - g0)
+        correction (time):  lambda   = max(0, lambda_p)
+        re-projection:      lambda~  = DFT[ lambda ]
+
+        Jacobian:  dr/dx_r = I + Y_r @ ( Gamma+ @ diag(mask) @ Gamma @ (eps I - Z_r) )
+
+    The masked operator ``Gamma+ @ diag(mask) @ Gamma`` is real-linear (NOT
+    holomorphic), so it is built with the existing AFT machinery
+    ``JacobianFourier_Real``: the contact mask is the time-domain tangent of
+    max(0, .), exactly analogous to df_nl/dq for a smooth nonlinearity. It must
+    NOT be wrapped by FRF_to_RI (that holomorphic form is valid only in
+    persistent contact, mask == 1). The complex-linear factors eps*I - Z_r and
+    Y_r DO use FRF_to_RI.
+
+    :param epsilon: penalty / Lagrangian factor. Must be large enough to detect
+        contact through the penalty: for stiffness ~1 use eps >~ 1e6 (robust at
+        1e8). The converged solution is eps-independent (Vadcard 2022).
+    :param g_zero: wall offset g0 (contact when x_r > g0).
+    :param h: finite-difference step for dY/domega.
+    """
+
+    def __init__(self, fbs_system: FBS_System, epsilon=1.0, g_zero=0.0, h=1e-6):
+        super().__init__(fbs_system)
+        self.epsilon = epsilon
+        self.g_zero = g_zero
+        self.complex_int_dimension = Fourier.number_of_harmonics * self.ode.dimension
+        self.h = h
+
+    def _get_Yr(self, x):
+        if x.Yr_cache is None:
+            x.Yr_cache = self.get_BY(x) @ self.B_fourier.T  # B * Y_A|B * B.T
+        return x.Yr_cache
+
+    def _get_Fext_admr(self, x):
+        return self.get_BY(x) @ self.F_ext_full  # complex free admittance response to excitation
+
+    def _get_Zr_rhs(self, x):
+        if x.Zr_rhs is None:
+            x.Zr_rhs = np.linalg.solve(self._get_Yr(x), self._get_Fext_admr(x) - vstack(x.fourier.coefficients))
+        return x.Zr_rhs
+
+    def _get_lambda_corrected(self, x):  # DLFT predict-correct
+        if x.lambda_corrected is None:
+            zr_fourier = Fourier(self._get_Zr_rhs(x).reshape(Fourier.number_of_harmonics, self.ode.dimension, 1))
+            Fourier_Real.compute_time_series(zr_fourier)
+            zr_t = zr_fourier.time_series  # (Nt, n_int, 1)
+            Fourier_Real.compute_time_series(x.fourier)
+            q_rel = x.fourier.time_series
+            lambda_x = zr_t + self.epsilon * (q_rel - self.g_zero)
+            x.contact_mask = lambda_x > 0
+            lambda_t_corr = np.where(x.contact_mask, lambda_x, 0.0)  # correction max(0, .)
+            lambda_x_corr = Fourier_Real.new_from_time_series(lambda_t_corr)
+            x.lambda_corrected = vstack(lambda_x_corr.coefficients)
+        return x.lambda_corrected
+
+    def compute_residue_RI(self, x: FourierOmegaPoint) -> array:
+        Q_rel = vstack(x.fourier.coefficients)
+        R = Q_rel + self._get_Yr(x) @ self._get_lambda_corrected(x) - self._get_Fext_admr(x)
+        return vstack((R.real, R.imag))
+
+    def _invert_Yr_blockwise(self, Yr: array) -> array:
+        n = self.ode.dimension
+        Zr = zeros_like(Yr)
+        for k in range(Fourier.number_of_harmonics):
+            s = slice(k * n, (k + 1) * n)
+            Zr[s, s] = np.linalg.solve(Yr[s, s], eye(n))
+        return Zr
+
+    def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> array:
+        self._get_lambda_corrected(x)                       # populates x.contact_mask  (Nt, n, 1)
+        n = self.ode.dimension
+        contact_tangent = x.contact_mask * eye(n)           # (Nt, n, n): diag(mask) per time sample
+        J_mask = JacobianFourier_Real.new_from_time_series(contact_tangent)
+        J_mask_RI = block([[J_mask.RR, J_mask.RI], [J_mask.IR, J_mask.II]])
+        M = self.epsilon * eye(self.complex_int_dimension) - self._invert_Yr_blockwise(self._get_Yr(x))
+        return eye(self.real_dimension) + self.get_BYBT_RI(x) @ J_mask_RI @ self.FRF_to_RI(M)
+
+
+    def _get_dY_complex(self, x) -> array:
+        return (self.compute_FRF(x.omega + self.h) - self.compute_FRF(x.omega - self.h)) / (2 * self.h)
+
+    def _get_dY_RI(self, x):
+        return self.FRF_to_RI(self._get_dY_complex(x))
+
+    def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> array:
+        dY_complex = self._get_dY_complex(x)
+        BdY = self.B_fourier @ dY_complex
+        lambda_corrected = self._get_lambda_corrected(x)
+        Zr_rhs = self._get_Zr_rhs(x)
+        dY_term = BdY @ (self.B_fourier.T @ lambda_corrected - self.F_ext_full)  # B*dY/dw*(B^T*lambda - Fext)
+        dlambda_pred = np.linalg.solve(self._get_Yr(x), BdY @ (self.F_ext_full - self.B_fourier.T @ Zr_rhs))
+        dlambda_pred_resh = dlambda_pred.reshape(Fourier.number_of_harmonics, self.ode.dimension, 1)  # (Nh, n_int, 1)
+        dlambda_pred_fourier = Fourier(dlambda_pred_resh)
+        Fourier_Real.compute_time_series(dlambda_pred_fourier)
+        dlambda_t_corr = np.where(x.contact_mask, dlambda_pred_fourier.time_series, 0.0)
+        dlambda_x_corr = Fourier_Real.new_from_time_series(dlambda_t_corr)
+        dlambda_x_corr_vector = vstack(dlambda_x_corr.coefficients)
+        dH = dY_term + self._get_Yr(x) @ dlambda_x_corr_vector
+        return vstack((dH.real, dH.imag))
+
+    def compute_full_response(self, fourier: Fourier, omega: float) -> Fourier:
+        x = FourierOmegaPoint(fourier, omega)
+        lambda_tilde = self._get_lambda_corrected(x)
+        Y = self.get_FRF(x)
+        Q_full = Y @ (self.F_ext_full - self.B_fourier.T @ lambda_tilde)
+        coefficients = Q_full.reshape(Fourier.number_of_harmonics, self.d_total, 1)
+        return Fourier(coefficients)
+
+
+class FBS_DLFT_numerical(FBS_DLFT, FrequencyBasedSubstructuring_numerical):
+    pass

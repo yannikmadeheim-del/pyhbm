@@ -1,4 +1,4 @@
-__version__ = "2.0"
+__version__ = "2.1"
 
 from .dynamical_system import (
     FirstOrderODE,
@@ -14,7 +14,6 @@ from .frequency_domain import (
     JacobianFourier,
     JacobianFourier_Real,
     JacobianFourier_Complex,
-    FirstOrderODE,
     FrequencyDomainFirstOrderODE,
     FrequencyDomainFirstOrderODE_Real,
     FrequencyDomainFirstOrderODE_Complex,
@@ -24,6 +23,23 @@ from .frequency_domain import (
     FrequencyBasedSubstructuring,
     FrequencyBasedSubstructuring_numerical,
     FrequencyBasedSubstructuring_experimental,
+)
+
+from .frf_provider import (
+    FRFProvider,
+    NumericalFRF,
+    ExperimentalFRF,
+)
+
+from .nonlinear_method import (
+    NonlinearMethod,
+    AFT,
+    DLFTContact,
+)
+
+from .hbm_problems import (
+    FRFProblem,
+    FBSProblem,
 )
 
 from .numerical_continuation.corrector_step import (
@@ -54,7 +70,7 @@ from .validation import (
 
 from .io import (
     plot_FRF,
-    save_solution_set
+    save_solution_set,
 )
 
 from .stability import (
@@ -66,43 +82,33 @@ from .stability import (
 
 __all__ = [
     "__version__",
-    "FirstOrderODE",
-    "Fourier",
-    "Fourier_Real",
-    "Fourier_Complex",
-    "FourierOmegaPoint",
-    "JacobianFourier",
-    "JacobianFourier_Real",
-    "JacobianFourier_Complex",
+    # base systems
+    "FirstOrderODE", "SecondOrderODE", "FBS_System",
+    # fourier
+    "Fourier", "Fourier_Real", "Fourier_Complex", "FourierOmegaPoint",
+    "JacobianFourier", "JacobianFourier_Real", "JacobianFourier_Complex",
+    # legacy frequency-domain classes (will be removed in cleanup step)
     "FrequencyDomainFirstOrderODE",
     "FrequencyDomainFirstOrderODE_Real",
     "FrequencyDomainFirstOrderODE_Complex",
-    "SecondOrderODE",
-    "FBS_System",
     "FrequencyDomainFRF",
     "FrequencyDomainFRF_experimental",
     "FrequencyDomainFRF_numerical",
     "FrequencyBasedSubstructuring",
     "FrequencyBasedSubstructuring_numerical",
     "FrequencyBasedSubstructuring_experimental",
-    "NewtonRaphson",
-    "CorrectorParameterization",
-    "OrthogonalParameterization",
-    "Predictor",
-    "TangentPredictorRobust",
-    "TangentPredictorOne",
-    "TangentPredictorTwo",
-    "StepLengthAdaptation",
-    "ExponentialAdaptation",
-    "BiExponentialAdaptation",
-    "SolutionSet",
-    "HarmonicBalanceMethod",
-    "plot_FRF",
-    "save_solution_set",
-    "TimeDomainValidator",
-    "ValidationResult",
-    "FloquetAnalyzer",
-    "StabilityReport",
-    "BifurcationDetector",
-    "SpecialPoint",
+    # new restructured API
+    "FRFProvider", "NumericalFRF", "ExperimentalFRF",
+    "NonlinearMethod", "AFT", "DLFTContact",
+    "FRFProblem", "FBSProblem",
+    # numerical continuation
+    "NewtonRaphson", "CorrectorParameterization", "OrthogonalParameterization",
+    "Predictor", "TangentPredictorRobust", "TangentPredictorOne", "TangentPredictorTwo",
+    "StepLengthAdaptation", "ExponentialAdaptation", "BiExponentialAdaptation",
+    # core
+    "SolutionSet", "HarmonicBalanceMethod",
+    # IO / validation / stability
+    "plot_FRF", "save_solution_set",
+    "TimeDomainValidator", "ValidationResult",
+    "FloquetAnalyzer", "StabilityReport", "BifurcationDetector", "SpecialPoint",
 ]
