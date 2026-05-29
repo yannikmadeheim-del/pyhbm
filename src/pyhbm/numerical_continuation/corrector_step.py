@@ -1,3 +1,4 @@
+import numpy as np
 from numpy import vdot, asarray
 from numpy.linalg import norm, solve
 
@@ -45,6 +46,22 @@ class NewtonRaphson(object):
 		self.delta = solve(self.jacobian, self.residue)
 	
 	def update_solution(self):
+		"""Backtracking line search (Armijo-style). Falls back to full step
+		    if no improvement is found within max_backtracks tries."""
+		alpha = 1.0
+		norm_old = norm(self.residue)
+		max_backtracks = 10
+		for _ in range(max_backtracks):
+			x_trial = self.x - alpha * self.delta
+			try:
+				r_trial = self.compute_residue(x_trial)
+				if norm(r_trial) < norm_old:
+					self.x = x_trial
+					self.residue = r_trial  # reuse — saves one func call next iter
+					return
+			except (np.linalg.LinAlgError, ValueError, FloatingPointError):
+				pass
+			alpha *= 0.5
 		self.x = self.x - self.delta
 	
 	def get_converged_result(self, iteration: int, return_jacobian: bool):
@@ -85,6 +102,25 @@ class NewtonRaphson(object):
 #%%
 
 class CorrectorParameterization(object):
+	"""
+		Augments the residual with one scalar equation that pins the Newton solution
+		to a specific point on the solution curve. Subclasses pick which information
+		they actually use from the common kwargs.
+
+		Common kwargs (all four passed by HarmonicBalanceMethod):
+		    predictor_vector   : tangent direction along the curve (column vector)
+		    predicted_solution : predictor extrapolation point (last + step * predictor_vector)
+		    last_solution      : previously converged point
+		    step_size          : signed arc-length step magnitude
+		"""
+
+	def __init__(self, *, predictor_vector=None, predicted_solution=None,
+	             last_solution=None, step_size=None, **_):
+		self.predictor_vector = predictor_vector
+		self.predicted_solution = predicted_solution
+		self.last_solution = last_solution
+		self.step_size = step_size
+
 	def compute_parameterization(**kwargs):
 		pass
 
@@ -92,10 +128,13 @@ class CorrectorParameterization(object):
 		pass
 
 class OrthogonalParameterization(CorrectorParameterization):
-	def __init__(self, predictor_vector, predicted_solution):
-		self.predictor_vector = predictor_vector
-		self.predicted_solution = predicted_solution
+	"""
+	Linear constraint: correction lies in the hyperplane through `predicted_solution`
+	orthogonal to `predictor_vector`. Robust through turning points where omega
+	is non-monotonic in arc length; quadratic-free, so Newton converges fast.
 
+	g(x) = <predictor_vector, x - predicted_solution>
+	"""
 	def compute_parameterization(self, point, *args):
 		return vdot(self.predictor_vector, point - self.predicted_solution)
 
@@ -103,10 +142,13 @@ class OrthogonalParameterization(CorrectorParameterization):
 		return self.predictor_vector.T
 
 class ArcLengthParameterization(CorrectorParameterization):
-	def __init__(self, last_solution, step_size):
-		self.last_solution = last_solution
-		self.step_size = step_size
+	"""
+	Keller pseudo-arclength: corrected solution lies on the sphere of radius
+	`step_size` around `last_solution`. Quadratic in x — Newton may need more
+	iterations at sharp bends.
 
+	g(x) = ||x - last_solution||^2 - step_size^2
+	"""
 	def compute_parameterization(self, point, *args):
 		delta = point - self.last_solution
 		return vdot(delta, delta) - self.step_size**2
