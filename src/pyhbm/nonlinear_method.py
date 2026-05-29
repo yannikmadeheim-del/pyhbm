@@ -141,8 +141,14 @@ class DLFTContact(NonlinearMethod):
             Fourier_Real.compute_time_series(x.fourier)
             q_rel  = x.fourier.time_series
             lambda_p = zr_t + self.epsilon * (q_rel - self.g_zero)
-            x.contact_mask     = lambda_p > 0
+            x.contact_mask     = lambda_p > 0.0
             lambda_t_corr      = np.where(x.contact_mask, lambda_p, 0.0)
+            # ALPHA = 1.0e6
+            # soft_mask = 0.5 * (1.0 + np.tanh(ALPHA * lambda_p))
+            # lambda_t_corr = soft_mask * lambda_p
+            # # keep storing the discrete mask for the Jacobian too, or use the smoothed one
+            # x.contact_mask = soft_mask  # was: lambda_p > 0
+
             lambda_x_corr      = Fourier_Real.new_from_time_series(lambda_t_corr)
             x.lambda_corrected = vstack(lambda_x_corr.coefficients)
         return x.lambda_corrected

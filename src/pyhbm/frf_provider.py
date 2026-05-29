@@ -38,7 +38,7 @@ class NumericalFRF(FRFProvider):
 
     def compute_FRF(self, omega: float, harmonics, d: int) -> array:
         Nh = len(harmonics)
-        Y = zeros((Nh * d, Nh * d), dtype=complex)
+        Y = zeros((Nh * d,Nh * d), dtype=complex)
         for k, n in enumerate(harmonics):
             Z_n = -(n * omega) ** 2 * self.M + 1j * n * omega * self.C + self.K
             Y[k * d:(k + 1) * d, k * d:(k + 1) * d] = np.linalg.solve(Z_n, eye(d))

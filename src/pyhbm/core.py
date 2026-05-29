@@ -184,10 +184,12 @@ class HarmonicBalanceMethod:
 			for __ in range(maximum_predictor_corrector_loops_per_solution):
 				
 				predicted_solution: FourierOmegaPoint = previous_solution + predictor_vector * step_length_adaptation.step_length
-    
+
 				self.parameterization = self.corrector_parameterization(
-					predictor_vector = predictor_vector,
-					predicted_solution = asarray(predicted_solution),
+					predictor_vector=predictor_vector,
+					predicted_solution=asarray(predicted_solution),
+					last_solution=asarray(previous_solution),
+					step_size=step_length_adaptation.step_length,
 				)
 
 				solution, iterations, success, jacobian = solver.solve(predicted_solution, return_jacobian=True)

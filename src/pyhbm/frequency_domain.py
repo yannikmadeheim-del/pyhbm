@@ -260,8 +260,23 @@ class JacobianFourier_Real(JacobianFourier):
 
         state = array([all_coefficients[harmonics] for harmonics in JacobianFourier.harmonics_state]) # row by row
         state_conj = array([all_coefficients[harmonics] for harmonics in JacobianFourier.harmonics_state_conj])
-        state_real = hstack(concatenate(state + state_conj, axis=1)) / Fourier.number_of_time_samples
-        state_imag = hstack(concatenate(state - state_conj, axis=1)) / Fourier.number_of_time_samples
+
+        plus  = state + state_conj
+        minus = state - state_conj
+
+        # Fix: halve the DC column (harmonic m=0). With the rfft convention used
+        # throughout pyhbm, the DC bin c_0 = N_t * a_0 has NO factor of 2,
+        # unlike c_k = (N_t/2) * (a_k - i b_k) for k >= 1. The Hankel doubling
+        # G_{n-m} + G_{n+m} is correct for m >= 1; for m = 0 the two terms are
+        # identical (G_n) and naive addition over-counts by factor 2.
+        # Identified via FD-Jacobian check in examples/sdof_vibroimpact_validation.
+        if 0 in Fourier.harmonics:
+            m0 = list(Fourier.harmonics).index(0)
+            plus[:, m0, :, :]  *= 0.5
+            minus[:, m0, :, :] *= 0.5   # already zero by construction; kept for symmetry
+
+        state_real = hstack(concatenate(plus,  axis=1)) / Fourier.number_of_time_samples
+        state_imag = hstack(concatenate(minus, axis=1)) / Fourier.number_of_time_samples
 
         return JacobianFourier_Real(RR = state_real.real, RI = -state_imag.imag, IR = state_real.imag, II = state_imag.real)
 

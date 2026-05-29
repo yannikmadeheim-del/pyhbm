@@ -1,0 +1,573 @@
+\documentclass[11pt]{article}
+
+% =====================================================================
+%  Dynamic Lagrangian Frequency--Time (DLFT) in admittance / FBS form
+%  Companion derivation for the pyhbm implementation (class FBS_DLFT).
+%
+%  Notation follows Krack & Gross, "Harmonic Balance for Nonlinear
+%  Vibration Problems" (2019); where it diverges we follow
+%  Vadcard, Batailly & Thouverez, J. Sound Vib. 531 (2022) 116950.
+%  FBS assembly follows van der Seijs, PhD thesis (2016), Ch. 3
+%  (LM-FBS, Eqs. 3.20-3.26) and Soleimani & Aage, CMAME 439 (2025)
+%  117882 (closed-form nonlinear FBS, Eq. 24).
+% =====================================================================
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+
+% ---- macros -------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\T}{^{\mathsf{T}}}
+\newcommand{\inv}{^{-1}}
+\newcommand{\Mb}{\bm{M}}
+\newcommand{\Cb}{\bm{C}}
+\newcommand{\Kb}{\bm{K}}
+\newcommand{\Zb}{\bm{Z}}
+\newcommand{\Yb}{\bm{Y}}
+\newcommand{\Bb}{\bm{B}}
+\newcommand{\Ib}{\bm{I}}
+\newcommand{\ub}{\bm{u}}
+\newcommand{\fb}{\bm{f}}
+\newcommand{\xb}{\bm{x}}
+\newcommand{\gb}{\bm{g}}
+\newcommand{\lamb}{\bm{\lambda}}
+\newcommand{\Gam}{\bm{\Gamma}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\blkdiag}{\operatorname{blkdiag}}
+\newcommand{\fadm}{\bm{f}_{\!\mathrm{adm}}}
+\newcommand{\xr}{\tilde{\bm{x}}_{\mathrm r}}      % multiharmonic relative displacement
+\newcommand{\lamt}{\tilde{\bm{\lambda}}}          % multiharmonic contact force
+\newcommand{\Yr}{\bm{Y}_{\mathrm r}}
+\newcommand{\Zr}{\bm{Z}_{\mathrm r}}
+\newcommand{\Real}{\operatorname{Re}}
+\newcommand{\Imag}{\operatorname{Im}}
+
+\title{\bf Dynamic Lagrangian Frequency--Time (DLFT) in admittance
+notation for Frequency-Based Substructuring}
+\author{Companion note for \texttt{pyhbm} -- class \texttt{FBS\_DLFT}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note derives the Dynamic Lagrangian Frequency--Time (DLFT)
+harmonic-balance method of Vadcard \emph{et al.} (2022) directly in
+\emph{admittance} (receptance/FRF) notation and embeds it in a
+Lagrange-multiplier Frequency-Based Substructuring (LM-FBS) assembly
+that uses signed Boolean matrices $\Bb_{\mathrm c},\Bb_{\mathrm e}$ on a
+block-diagonal substructure admittance $\Yb=\blkdiag(\Yb^1,\Yb^2,\dots)$.
+The closed-form coupling of Soleimani \& Aage (2025, Eq.~24) is recovered
+as the two-substructure special case. We give the residual, the
+\emph{full} analytic Jacobian $\partial\bm r/\partial\xr$ and
+$\partial\bm r/\partial\omega$ (including the conditional contact term and
+the $\partial\Yb/\partial\omega$ chain rule), state exactly where the
+DFT/IDFT enter, and answer the algorithmic question: \emph{the primary
+Newton unknown is the multiharmonic vector of relative-displacement
+Fourier coefficients $\xr$, not the contact forces $\lamt$.} The
+derivation is the specification for the \texttt{FBS\_DLFT} class and the
+predictor--corrector continuation loop in \texttt{pyhbm}.
+\end{abstract}
+
+\tableofcontents
+
+% =====================================================================
+\section{Notation and harmonic-balance preliminaries}
+% =====================================================================
+Consider a linear elastic substructure with mass, damping and stiffness
+matrices $\Mb,\Cb,\Kb\in\R^{d\times d}$ driven at the fundamental angular
+frequency $\omega$. With the (real) Fourier ansatz for a $T=2\pi/\omega$
+periodic displacement,
+\begin{equation}
+\ub(t)\;=\;\Real\!\sum_{n\in\mathcal H}\hat\ub_n\,e^{\,\mathrm i n\omega t},
+\qquad \mathcal H=\{0,1,\dots,N_H\},\quad N_h=|\mathcal H|,
+\label{eq:ansatz}
+\end{equation}
+each harmonic $n$ obeys the algebraic balance
+\begin{equation}
+\Zb_n(\omega)\,\hat\ub_n \;=\; \hat\fb_n,
+\qquad
+\Zb_n(\omega)\;=\;\Kb-(n\omega)^2\Mb+\mathrm i\,n\omega\,\Cb \;\in\;\C^{d\times d},
+\label{eq:Zn}
+\end{equation}
+where $\Zb_n$ is the \emph{dynamic stiffness} (impedance) and
+$\Yb_n(\omega)=\Zb_n(\omega)\inv$ the \emph{admittance} (receptance/FRF) of
+harmonic $n$. Stacking harmonics,
+$\xr,\hat\fb\in\C^{N_h d}$, the block-diagonal multiharmonic operators are
+\begin{equation}
+\Zb(\omega)=\blkdiag_{n\in\mathcal H}\Zb_n(\omega),
+\qquad
+\Yb(\omega)=\Zb(\omega)\inv=\blkdiag_{n\in\mathcal H}\Yb_n(\omega).
+\label{eq:ZYblock}
+\end{equation}
+For a nonlinear system with internal force $\fb_{\mathrm{nl}}$ the
+multiharmonic balance residual reads, in impedance form
+(Vadcard Eq.~23; Krack \S2),
+\begin{equation}
+\mathcal H(\hat\ub,\omega)\;=\;\Zb(\omega)\,\hat\ub
++\tilde\fb_{\mathrm{nl}}(\hat\ub)-\tilde\fb_{\mathrm{ext}}\;=\;\bm 0.
+\label{eq:HBimp}
+\end{equation}
+
+\paragraph{DFT/IDFT operators.}
+Nonlinear and contact forces are evaluated in the time domain on
+$N_t$ equispaced samples $\tau_i=2\pi i/N_t$, $i=0,\dots,N_t-1$
+($N_t$ over-samples the band $\mathcal H$). Let
+\begin{equation}
+\Gam:\ \C^{N_h d}\!\to\R^{N_t d}\ \text{(synthesis / IDFT)},
+\qquad
+\Gam^{+}:\ \R^{N_t d}\!\to\C^{N_h d}\ \text{(analysis / DFT)},
+\label{eq:dft}
+\end{equation}
+so that a band-limited real signal $\bm s(t_i)=\Gam\,\hat{\bm s}$ and
+$\hat{\bm s}=\Gam^{+}\bm s$, with $\Gam^{+}\Gam=\Ib$ on the retained band.
+Acting on the real/imaginary split $\hat{\bm s}=\hat{\bm s}_R+\mathrm i\hat{\bm s}_I$,
+the (real) entries of $\Gam,\Gam^{+}$ for one DOF are
+\begin{equation}
+\Gam_{i,n}^{(R)}=\tfrac{c_n}{N_t}\cos(n\tau_i),\quad
+\Gam_{i,n}^{(I)}=-\tfrac{c_n}{N_t}\sin(n\tau_i),\quad
+\Gam^{+(R)}_{n,i}=\cos(n\tau_i),\quad
+\Gam^{+(I)}_{n,i}=-\sin(n\tau_i),
+\label{eq:dftentries}
+\end{equation}
+with $c_0=1$, $c_{n>0}=2$ (the \texttt{numpy.rfft}/\texttt{irfft}
+convention used in \texttt{pyhbm}). The distinction
+``$\Gam$ acts on the \emph{real} pair $(\hat{\bm s}_R,\hat{\bm s}_I)$''
+is essential for the Jacobian (\S\ref{sec:jac}).
+
+% =====================================================================
+\section{LM-FBS assembly and condensation to the relative interface DOF}
+% =====================================================================
+\subsection{Dual (Lagrange-multiplier) assembly}
+Let substructures $s=1,\dots,N_s$ have admittances $\Yb^s(\omega)$.
+Concatenate the global, \emph{uncoupled} quantities
+\begin{equation}
+\ub=\operatorname{col}(\ub^1,\dots,\ub^{N_s}),\quad
+\fb=\operatorname{col}(\fb^1,\dots,\fb^{N_s}),\quad
+\Yb=\blkdiag(\Yb^1,\dots,\Yb^{N_s}),
+\label{eq:concat}
+\end{equation}
+(each understood per harmonic, or block-diagonal over $\mathcal H$ as in
+\eqref{eq:ZYblock}). Following van der Seijs (Eqs.~3.20, 3.25), coupling is
+imposed through a \emph{compatibility} Boolean $\Bb_{\mathrm c}$ and an
+\emph{equilibrium} Boolean $\Bb_{\mathrm e}$: the connecting forces are
+$\bm g=-\Bb_{\mathrm e}\T\lamb$ and compatibility reads
+$\Bb_{\mathrm c}\ub=\bm 0$. The dual system is
+\begin{equation}
+\ub=\Yb\bigl(\fb-\Bb_{\mathrm e}\T\lamb\bigr),
+\qquad \Bb_{\mathrm c}\ub=\bm 0 .
+\label{eq:dual}
+\end{equation}
+For \emph{collocated, conforming} interfaces (the case implemented here)
+$\Bb_{\mathrm c}=\Bb_{\mathrm e}=:\Bb$ is the signed Boolean with $\pm1$ on
+each connected DOF pair. Eliminating $\lamb$ for a \emph{rigid} joint gives
+the classical LM-FBS one-liner (van der Seijs Eqs.~3.21--3.23)
+\begin{equation}
+\lamb=\bigl(\Bb_{\mathrm c}\Yb\Bb_{\mathrm e}\T\bigr)\inv \Bb_{\mathrm c}\Yb\fb,
+\qquad
+\tilde\Yb=\Bigl[\Ib-\Yb\Bb_{\mathrm e}\T(\Bb_{\mathrm c}\Yb\Bb_{\mathrm e}\T)\inv\Bb_{\mathrm c}\Bigr]\Yb .
+\label{eq:lmfbs}
+\end{equation}
+
+\subsection{Nonlinear interface: condensation onto the relative DOF}
+\label{sec:cond}
+With a \emph{nonlinear} interface the rigid constraint
+$\Bb_{\mathrm c}\ub=\bm0$ is replaced by an interface constitutive law: the
+multiplier $\lamt$ becomes the (unknown) contact force that depends on the
+relative interface motion. Define the multiharmonic
+\emph{relative interface displacement}
+\begin{equation}
+\xr \;:=\; \Bb_{\mathrm c}\,\hat\ub \;\in\;\C^{N_h\,n_{\mathrm{int}}},
+\label{eq:xrel}
+\end{equation}
+($n_{\mathrm{int}}$ interface DOF pairs). Substituting the first line of
+\eqref{eq:dual} into \eqref{eq:xrel},
+\begin{equation}
+\xr=\Bb_{\mathrm c}\Yb\fb-\Bb_{\mathrm c}\Yb\Bb_{\mathrm e}\T\lamt
+=\fadm-\Yr\,\lamt,
+\label{eq:cond}
+\end{equation}
+where we name the \emph{interface admittance} and the \emph{admittance
+(free) excitation response}
+\begin{equation}
+\boxed{\;\Yr:=\Bb_{\mathrm c}\Yb\Bb_{\mathrm e}\T\;}\quad(=\Yb^1+\Yb^2\ \text{collocated, 2 subs.}),
+\qquad
+\boxed{\;\fadm:=\Bb_{\mathrm c}\Yb\,\tilde\fb_{\mathrm{ext}}\;}.
+\label{eq:YrFadm}
+\end{equation}
+Equation \eqref{eq:cond} rearranges to the \textbf{admittance FBS residual}
+\begin{equation}
+\boxed{\;\bm r(\xr)\;=\;\xr+\Yr\,\lamt-\fadm\;=\;\bm 0\;}
+\label{eq:residual}
+\end{equation}
+which is the master equation of this note. It is the admittance
+counterpart of Vadcard's impedance condensation $\Zr\xr+\lamt-\tilde\fb_{\mathrm{ex,r}}=\bm0$
+(his Eq.~37): multiply \eqref{eq:residual} from the left by
+$\Zr:=\Yr\inv$ and use $\Zr\fadm=\tilde\fb_{\mathrm{ex,r}}$ to recover it.
+Hence the impedance and admittance residuals share the same root; they
+differ only by the left factor $\Yr$, i.e.\ by conditioning
+(see \S\ref{sec:cond-number}).
+
+\subsection{Recovery of Soleimani's closed form (two substructures)}
+For $N_s=2$ collocated substructures, $\Bb_{\mathrm c}=\Bb_{\mathrm e}=[\,\Ib\ \;-\Ib\,]$ on
+the boundary DOFs, $\Yb=\blkdiag(\Yb^1,\Yb^2)$, so
+\begin{equation}
+\Yr=\Bb\Yb\Bb\T=\Yb^1_{bb}+\Yb^2_{bb},\qquad
+\fadm=\Yb^1_{be}\hat\fb^1_e-\Yb^2_{be}\hat\fb^2_e,
+\label{eq:soltwo}
+\end{equation}
+and \eqref{eq:residual} reads
+$\xr+(\Yb^1_{bb}+\Yb^2_{bb})\lamt-(\Yb^1_{be}\hat\fb^1_e-\Yb^2_{be}\hat\fb^2_e)=\bm0$,
+i.e.\ exactly Soleimani \& Aage Eq.~(24) with $\lamt=\bm f_N$ (their
+receptance $\bm H\equiv\Yb$). The grounded/unilateral case
+(``one substructure rigid'') sets $\Yb^2\to\bm0$, giving
+$\Yr=\Yb^1_{bb}$, $\fadm=\Yb^1_{be}\hat\fb^1_e$ -- the wall test case in
+\texttt{examples/fbs\_dnft\_unilateral\_spring}.
+
+% =====================================================================
+\section{Unilateral contact and the DLFT slaving of $\lamt$}
+% =====================================================================
+\subsection{Constraints}
+The interface is a unilateral (compression-only) contact. With the gap
+(clearance) function and contact pressure $\lambda(t)$ the
+Hertz--Signorini--Moreau / unilateral contact conditions (UCC) are
+\begin{equation}
+g(t)\ge 0,\qquad \lambda(t)\ge 0,\qquad g(t)\,\lambda(t)=0 .
+\label{eq:ucc}
+\end{equation}
+We use the (implemented) convention of a wall at relative offset $g_0$:
+the scalar relative coordinate $x_{\mathrm r}(t)=(\Gam\xr)(t)$ may not pass
+the wall, so
+\begin{equation}
+g(t)=g_0-x_{\mathrm r}(t),\qquad
+\text{penetration } p(t)=x_{\mathrm r}(t)-g_0=-g(t).
+\label{eq:gap}
+\end{equation}
+(Vadcard writes $g=x_{\mathrm r}+g_0$ with the opposite sign of
+$x_{\mathrm r}$; \eqref{eq:gap} is the mirror convention and is physically
+equivalent for a wall at $+g_0$.)
+
+\subsection{Prediction step (admittance form)}
+\label{sec:pred}
+The contact force is not an independent unknown; it is \emph{slaved} to
+$\xr$ by a prediction--correction (this is what makes DLFT cheap -- it does
+\emph{not} double the unknowns with explicit multipliers). Isolating the
+multiplier in the equilibrium relation and adding a gap penalty with
+factor $\varepsilon>0$ (Vadcard Eq.~40), the prediction is
+\begin{equation}
+\lamt_{\mathrm p}(\xr)
+=\Zr\bigl(\fadm-\xr\bigr)\;-\;\varepsilon\,\tilde{\bm g}
+=\underbrace{\Zr\bigl(\fadm-\xr\bigr)}_{\text{balancing force}}
++\;\varepsilon\,(\xr-\tilde{\bm g}_0),
+\qquad \Zr=\Yr\inv .
+\label{eq:pred}
+\end{equation}
+The first term is the force that exactly satisfies the balance
+\eqref{eq:residual} at the current $\xr$ (note
+$\Zr(\fadm-\xr)=\tilde\fb_{\mathrm{ex,r}}-\Zr\xr$, recovering Vadcard's
+$\tilde\fb_{\mathrm{ex,r}}-\Zr\xr$). Forming $\Zr=\Yr\inv$ from the
+substructure admittances is the one place the admittance assembly must
+\emph{invert} the interface admittance $\Yr=\Bb_{\mathrm c}\Yb\Bb_{\mathrm e}\T$ -- the same
+matrix whose conditioning van der Seijs (after Eq.~3.26) calls ``highly
+defining for the success of the coupling.''
+
+\paragraph{Where the IDFT enters.} The UCC \eqref{eq:ucc} are pointwise in
+time, so the prediction is taken to the time domain,
+\begin{equation}
+\lambda_{\mathrm p}(t_i)=\bigl(\Gam\,\lamt_{\mathrm p}\bigr)_i
+=\bigl(\Gam\,\Zr(\fadm-\xr)\bigr)_i+\varepsilon\bigl(x_{\mathrm r}(t_i)-g_0\bigr).
+\label{eq:predtime}
+\end{equation}
+Interpretation (Vadcard \S2.4.2): where the gap is \emph{violated}
+($p>0$) the penalty drives $\lambda_{\mathrm p}$ strongly positive
+(contact detected); where the bodies \emph{separate} ($p<0$, i.e.\
+$g>0$) it drives $\lambda_{\mathrm p}$ negative (to be removed below);
+in persistent contact ($g\approx0$) the penalty is negligible.
+
+\subsection{Correction step (UCC enforcement) and where the DFT enters}
+\label{sec:corr}
+The predicted pressure violates $\lambda\ge0$ during separation. The
+correction enforces positivity \emph{pointwise in time} (Vadcard Eq.~42),
+\begin{equation}
+\lambda(t_i)=\max\!\bigl(0,\ \lambda_{\mathrm p}(t_i)\bigr)
+=\begin{cases}\lambda_{\mathrm p}(t_i)& \lambda_{\mathrm p}(t_i)>0\ \text{(contact)}\\[2pt]
+0 & \lambda_{\mathrm p}(t_i)\le 0\ \text{(separation)}\end{cases}
+\label{eq:corr}
+\end{equation}
+and is transformed back to the frequency domain by the \emph{DFT}:
+\begin{equation}
+\lamt(\xr)=\Gam^{+}\bigl\{\max(0,\lambda_{\mathrm p}(t_i))\bigr\}_{i=1\dots N_t}.
+\label{eq:lamtilde}
+\end{equation}
+Equations \eqref{eq:pred}--\eqref{eq:lamtilde} define the map
+$\xr\mapsto\lamt(\xr)$; substituting into \eqref{eq:residual} gives the
+\emph{single}-argument residual $\bm r(\xr)$ that the corrector solves.
+The contact set is encoded by the time-domain Boolean mask
+\begin{equation}
+m_i=\mathbf 1\!\left[\lambda_{\mathrm p}(t_i)>0\right]\in\{0,1\},
+\qquad \bm m=\diag(m_1,\dots,m_{N_t}) .
+\label{eq:mask}
+\end{equation}
+
+% =====================================================================
+\section{The primary Newton unknown}
+% =====================================================================
+\noindent\textbf{Claim.} \emph{The algorithmic Newton unknown is the
+multiharmonic relative displacement $\xr$ (its $2N_h n_{\mathrm{int}}$ real
+DOF), not the contact force $\lamt$.}
+
+\smallskip\noindent\emph{Justification from the residual/Jacobian structure
+(not convention):}
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+\item After \eqref{eq:pred}--\eqref{eq:lamtilde}, $\lamt$ is an explicit
+\emph{function} $\lamt(\xr)$. The residual \eqref{eq:residual} therefore
+depends on $\xr$ \emph{only}; the root-finding lives in
+$\R^{2N_h n_{\mathrm{int}}}$ and the Jacobian
+$\partial\bm r/\partial\xr$ (\S\ref{sec:jac}) is \emph{square} in that
+space.
+\item Promoting $\lamt$ to an independent unknown would require appending
+the prediction equation and the complementarity \eqref{eq:ucc} as extra
+equations, \emph{doubling} the system and re-introducing the explicit
+Lagrange multipliers DLFT is designed to avoid (Vadcard \S2.4.1; this is
+the very difference between DLFT and a wet/saddle-point Lagrangian, cf.\
+van der Seijs Eq.~3.28). The admittance form makes this concrete: $\Yr$
+in \eqref{eq:residual} already \emph{is} the condensed interface operator,
+so no auxiliary force DOF are needed.
+\item Consequently the continuation tangent and step are taken in
+$(\xr,\omega)$. The contact force is never a state: it is recomputed from
+$\xr$ at \emph{every} residual evaluation.
+\end{enumerate}
+
+\noindent\textbf{Distinguish two notions.}
+\emph{(i) Choice of unknowns (algorithmic):} $\xr$, as argued above.
+\emph{(ii) Initial guess at each continuation step (predictor):} the
+tangent predictor extrapolates the converged $(\xr,\omega)$ of the
+previous point; equivalently the linear relative response
+$\xr^{(0)}=\fadm$ (no contact) is a natural cold start. \textbf{In both
+cases the carried quantity is the relative-displacement Fourier
+coefficients, never the contact forces} -- $\lamt$ is regenerated by
+\eqref{eq:pred}--\eqref{eq:lamtilde}.
+
+% =====================================================================
+\section{Analytic Jacobian}
+\label{sec:jac}
+% =====================================================================
+The corrector and the arc-length predictor need
+$\partial\bm r/\partial\xr$ and $\partial\bm r/\partial\omega$. Both follow
+from \eqref{eq:residual} by the chain rule through the slaving map.
+
+\subsection{Derivative w.r.t.\ the relative-displacement coefficients}
+From \eqref{eq:residual},
+\begin{equation}
+\frac{\partial\bm r}{\partial\xr}
+=\Ib+\Yr\,\frac{\partial\lamt}{\partial\xr}.
+\label{eq:drdx}
+\end{equation}
+The slaving map \eqref{eq:pred}--\eqref{eq:lamtilde} differentiates in
+three stages.
+
+\paragraph{(a) Prediction (frequency, holomorphic).} From \eqref{eq:pred},
+$\lamt_{\mathrm p}=(\Zr\fadm-\varepsilon\tilde{\bm g}_0)+(\varepsilon\Ib-\Zr)\xr$, hence
+\begin{equation}
+\frac{\partial\lamt_{\mathrm p}}{\partial\xr}=\varepsilon\Ib-\Zr
+\qquad(\text{Vadcard A.3: }\ -\Zr-\varepsilon\Ib\ \text{in his sign convention}).
+\label{eq:dpred}
+\end{equation}
+This block is \emph{complex-linear} (holomorphic): in the real/imaginary
+(RI) split it has the structure $\bigl[\begin{smallmatrix}\Real&-\Imag\\\Imag&\Real\end{smallmatrix}\bigr]$.
+
+\paragraph{(b) Correction (time, conditional / non-holomorphic).} The
+$\max(0,\cdot)$ in \eqref{eq:corr} has derivative $m_i$ pointwise
+(Vadcard A.4): keep the predicted sensitivity where there is contact, zero
+it where there is separation. With the mask \eqref{eq:mask},
+\begin{equation}
+\frac{\partial\lambda(t_i)}{\partial\xr}
+=\begin{cases}\dfrac{\partial\lambda_{\mathrm p}(t_i)}{\partial\xr}&\lambda_{\mathrm p}(t_i)>0\\[6pt]
+\bm 0&\lambda_{\mathrm p}(t_i)\le0\end{cases}
+\;=\;\bm m\,\Gam\,\frac{\partial\lamt_{\mathrm p}}{\partial\xr}.
+\label{eq:dcorr}
+\end{equation}
+
+\paragraph{(c) Re-projection (DFT).} Transform back with $\Gam^{+}$:
+\begin{equation}
+\boxed{\;
+\frac{\partial\lamt}{\partial\xr}
+=\Gam^{+}\,\bm m\,\Gam\,\bigl(\varepsilon\Ib-\Zr\bigr)\;}
+\qquad\Longrightarrow\qquad
+\frac{\partial\bm r}{\partial\xr}
+=\Ib+\Yr\,\Gam^{+}\,\bm m\,\Gam\,\bigl(\varepsilon\Ib-\Zr\bigr).
+\label{eq:Jfull}
+\end{equation}
+
+\paragraph{Why this is \emph{not} a holomorphic FRF map (the key
+correctness point).} The factors $\Yr$ and $(\varepsilon\Ib-\Zr)$ are
+complex-linear, but $\bm m$ is a real diagonal acting \emph{in the time
+domain} between $\Gam$ and $\Gam^{+}$. The composite
+$\Gam^{+}\bm m\,\Gam$ is therefore \emph{real-linear but not complex-linear}:
+in the RI split it is a \emph{general} block
+$\bigl[\begin{smallmatrix}\bm A_{RR}&\bm A_{RI}\\\bm A_{IR}&\bm A_{II}\end{smallmatrix}\bigr]$
+with $\bm A_{RR}\neq\bm A_{II}$ and $\bm A_{RI}\neq-\bm A_{IR}$ in general.
+Hence \eqref{eq:Jfull} \textbf{must} be assembled with the real operators
+$\Gam,\Gam^{+}$ of \eqref{eq:dftentries}; collapsing it into the
+holomorphic form $\bigl[\begin{smallmatrix}\Real&-\Imag\\\Imag&\Real\end{smallmatrix}\bigr]$
+of the complex matrix $\Ib+\Yr(\varepsilon\Ib-\Zr)$ is only valid in
+\emph{persistent} contact ($\bm m=\Ib$, where $\Gam^{+}\Gam=\Ib$) and is
+wrong as soon as the contact set is partial. (This was the dominant bug in
+the original \texttt{compute\_jacobian\_of\_residue\_RI}.) When $\bm m=\Ib$
+the boxed result correctly collapses to
+$\partial\bm r/\partial\xr=\varepsilon\,\Yr$.
+
+\subsection{Derivative w.r.t.\ frequency}
+Here $\xr$ is held fixed and the $\omega$-dependence enters through
+$\Yb(\omega)$. Per-harmonic,
+\begin{equation}
+\frac{\partial\Zb_n}{\partial\omega}=-2n^2\omega\,\Mb+\mathrm i\,n\,\Cb,
+\qquad
+\frac{\partial\Yb_n}{\partial\omega}=-\Yb_n\,\frac{\partial\Zb_n}{\partial\omega}\,\Yb_n,
+\label{eq:dY}
+\end{equation}
+and $\partial\Yr/\partial\omega=\Bb_{\mathrm c}(\partial\Yb/\partial\omega)\Bb_{\mathrm e}\T$,
+$\partial\fadm/\partial\omega=\Bb_{\mathrm c}(\partial\Yb/\partial\omega)\tilde\fb_{\mathrm{ext}}$,
+$\partial\Zr/\partial\omega=-\Zr(\partial\Yr/\partial\omega)\Zr$.
+Differentiating \eqref{eq:residual},
+\begin{equation}
+\frac{\partial\bm r}{\partial\omega}
+=\frac{\partial\Yr}{\partial\omega}\,\lamt
++\Yr\,\frac{\partial\lamt}{\partial\omega}
+-\frac{\partial\fadm}{\partial\omega}.
+\label{eq:drdw}
+\end{equation}
+The contact-force term uses the \emph{same} time-domain mask as
+\eqref{eq:Jfull}; since $\partial\lamt_{\mathrm p}/\partial\omega$ is a
+single (real-signal) vector its IDFT is unambiguous:
+\begin{equation}
+\frac{\partial\lamt}{\partial\omega}
+=\Gam^{+}\,\bm m\,\Gam\;
+\underbrace{\Bigl[\tfrac{\partial\Zr}{\partial\omega}(\fadm-\xr)+\Zr\,\tfrac{\partial\fadm}{\partial\omega}\Bigr]}_{\partial\lamt_{\mathrm p}/\partial\omega},
+\quad
+\frac{\partial\lamt_{\mathrm p}}{\partial\omega}
+=\Zr\,\frac{\partial(\Bb\Yb)}{\partial\omega}\bigl(\tilde\fb_{\mathrm{ext}}-\Bb_{\mathrm e}\T\Zr(\fadm-\xr)\bigr).
+\label{eq:dlamdw}
+\end{equation}
+The first two terms of \eqref{eq:drdw} combine to
+$\Bb_{\mathrm c}(\partial\Yb/\partial\omega)(\Bb_{\mathrm e}\T\lamt-\tilde\fb_{\mathrm{ext}})$,
+matching the implemented \texttt{compute\_derivative\_wrt\_omega\_RI}
+(verified against finite differences to $\sim10^{-13}$).
+
+% =====================================================================
+\section{Properties, conditioning and algorithm}
+% =====================================================================
+\subsection{$\varepsilon$-independence of the solution}
+At convergence ($\bm r=\bm0$) the solution is independent of
+$\varepsilon$. With $\lambda=\lambda_{\mathrm p}+\lambda_{\mathrm c}$ and
+$\lambda_{\mathrm c}=\max(0,-\lambda_{\mathrm p})\ge0$, substituting the
+prediction \eqref{eq:pred} into \eqref{eq:residual} gives
+$\bm r=\Yr(\lamt_{\mathrm c}-\varepsilon\tilde{\bm g})$, i.e.\ the impedance
+residual $\Zr\bm r=\lamt_{\mathrm c}-\varepsilon\tilde{\bm g}$. The
+correction satisfies $0\le\tfrac1\varepsilon\lambda_{\mathrm c}=g_{\mathrm p}\perp\lambda\ge0$
+(Vadcard Eqs.~44--45), so the root $\tilde{\bm g}_{\mathrm p}=\tilde{\bm g}$
+is reached independently of $\varepsilon$. Two practical caveats:
+(i) $\varepsilon$ must be \emph{large enough} to detect contact through the
+penalty -- in the test problem (stiffness $\sim1$) convergence requires
+$\varepsilon\gtrsim10^{6}$ and is robust at $10^{8}$ (Vadcard sweeps
+$\varepsilon\in[10^{8},2\!\cdot\!10^{12}]$); (ii) larger $\varepsilon$
+amplifies the harmonic-truncation oscillations of the non-smooth
+$\lambda(t)$, so the \emph{absolute} residual at the floor scales with
+$\varepsilon$ -- the convergence test must be relative (below).
+
+\subsection{Conditioning: why admittance vs.\ impedance matters}
+\label{sec:cond-number}
+The two residuals are related by $\bm r_{\mathrm{adm}}=\Yr\,\mathcal H_{\mathrm{imp}}$.
+Near a substructure resonance $\Yr$ is large and ill-conditioned, so
+admittance-form Newton is more sensitive there; this is intrinsic to FBS
+with measured/numeric FRFs (van der Seijs after Eq.~3.26). The admittance
+form is nevertheless required for experimental FRFs and is what the FBS
+solver uses; the cure is a relative/scaled convergence criterion and arc-length
+continuation with adaptive steps.
+
+\subsection{Solver criterion}
+Because of the truncation floor, the corrector accepts $\xr$ when
+\emph{either} the residual is small relative to its value at the predictor,
+$\|\bm r\|\le\eta_{\mathrm{rel}}\|\bm r^{(0)}\|$, \emph{or} the Newton step
+stagnates, $\|\Delta\xr\|\le\eta_{\mathrm{stag}}\|\xr\|$ (the floor is
+reached), in addition to the original absolute test
+$\|\bm r\|<\eta_{\mathrm{abs}}$.
+
+\subsection{Algorithm (drop-in replacement for AFT)}
+\begin{center}
+\fbox{\begin{minipage}{0.93\textwidth}
+\textbf{DLFT residual/Jacobian at $(\xr,\omega)$} -- same interface as AFT:
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt]
+\item Build $\Yb(\omega)$ (numeric from $\Mb,\Cb,\Kb$, or interpolated FRF);
+$\Yr=\Bb_{\mathrm c}\Yb\Bb_{\mathrm e}\T$, $\fadm=\Bb_{\mathrm c}\Yb\tilde\fb_{\mathrm{ext}}$, $\Zr=\Yr\inv$.
+\item \emph{Prediction:} $\lamt_{\mathrm p}=\Zr(\fadm-\xr)+\varepsilon(\xr-\tilde{\bm g}_0)$;
+$\lambda_{\mathrm p}=\Gam\lamt_{\mathrm p}$ \hfill (IDFT).
+\item \emph{Correction:} $\lambda=\max(0,\lambda_{\mathrm p})$, mask $\bm m$;
+$\lamt=\Gam^{+}\lambda$ \hfill (DFT).
+\item \emph{Residual:} $\bm r=\xr+\Yr\lamt-\fadm$.
+\item \emph{Jacobian:}
+$\partial\bm r/\partial\xr=\Ib+\Yr\,\Gam^{+}\bm m\,\Gam(\varepsilon\Ib-\Zr)$;
+$\partial\bm r/\partial\omega$ from \eqref{eq:drdw}--\eqref{eq:dlamdw}.
+\end{enumerate}
+The corrector solves $\bm r(\xr)=\bm0$ for $\xr$ inside the
+predictor--corrector arc-length continuation in $\omega$; \emph{only}
+steps 2--3 (AFT $\fb_{\mathrm{nl}}$) and step 5 differ between AFT and DLFT.
+Response recovery uses
+$\hat\ub=\Yb(\tilde\fb_{\mathrm{ext}}-\Bb_{\mathrm e}\T\lamt)$
+(Soleimani Eqs.~25--26).
+\end{minipage}}
+\end{center}
+
+% =====================================================================
+\section{Map to the \texttt{pyhbm} implementation}
+% =====================================================================
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Symbol & Meaning & \texttt{FBS\_DLFT} member \\
+\midrule
+$\xr$ & rel.\ displacement coeff.\ (Newton unknown) & \texttt{x.fourier.coefficients} \\
+$\Bb_{\mathrm c}=\Bb_{\mathrm e}=\Bb$ & signed Boolean (multiharmonic) & \texttt{self.B\_fourier} \\
+$\Yb$ & block-diag substructure admittance & \texttt{compute\_FRF(omega)} \\
+$\Yr=\Bb\Yb\Bb\T$ & interface admittance & \texttt{\_get\_Yr} \\
+$\fadm=\Bb\Yb\tilde\fb_{\mathrm{ext}}$ & free relative response & \texttt{\_get\_Fext\_admr} \\
+$\Zr(\fadm-\xr)$ & balancing force (pre-penalty) & \texttt{\_get\_Zr\_rhs} \\
+$\lamt=\Gam^{+}\max(0,\lambda_{\mathrm p})$ & corrected contact force & \texttt{\_get\_lambda\_corrected} \\
+$\bm m$ & contact mask $\mathbf1[\lambda_{\mathrm p}>0]$ & \texttt{x.contact\_mask} \\
+$\Gam,\Gam^{+}$ & real IDFT/DFT \eqref{eq:dftentries} & \texttt{self.\_idft\_RI},\,\texttt{self.\_dft\_RI} \\
+$\partial\bm r/\partial\xr$ & Eq.~\eqref{eq:Jfull} & \texttt{compute\_jacobian\_of\_residue\_RI} \\
+$\partial\bm r/\partial\omega$ & Eq.~\eqref{eq:drdw} & \texttt{compute\_derivative\_wrt\_omega\_RI} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Diagnosed defects of the original code (corrected per this note).}
+(b) the matrix $\partial\lamt/\partial\xr$ was built with \texttt{rfft/irfft}
+on \emph{complex} columns and then wrapped by the holomorphic
+\texttt{FRF\_to\_RI}, i.e.\ \eqref{eq:Jfull} assembled as if
+$\Gam^{+}\bm m\,\Gam$ were complex-linear -- wrong for partial contact;
+(c) $\varepsilon=10^{2}$ was orders of magnitude too small;
+(a) the sign of the penalty is self-consistent with a wall at $+g_0$
+(equivalent to Vadcard up to the sign of $x_{\mathrm r}$);
+(d) the time-domain correction \eqref{eq:corr} before the DFT was already
+correct; $\partial\bm r/\partial\omega$ was already correct.
+
+\begin{thebibliography}{9}
+\bibitem{Vadcard2022} T.\ Vadcard, A.\ Batailly, F.\ Thouverez,
+\emph{On Harmonic Balance Method-based Lagrangian contact formulations for
+vibro-impact problems}, J.\ Sound Vib.\ \textbf{531} (2022) 116950.
+\bibitem{VdS2016} M.\ van der Seijs, \emph{Experimental Dynamic
+Substructuring}, PhD thesis, TU Delft (2016), Ch.~3 (LM-FBS, Eqs.~3.20--3.28).
+\bibitem{Soleimani2025} H.\ Soleimani, N.\ Aage,
+\emph{A closed-form nonlinear dynamic substructuring method}, CMAME
+\textbf{439} (2025) 117882 (Eq.~24).
+\bibitem{Krack2019} M.\ Krack, J.\ Gross, \emph{Harmonic Balance for
+Nonlinear Vibration Problems}, Springer (2019).
+\end{thebibliography}
+
+\end{document}

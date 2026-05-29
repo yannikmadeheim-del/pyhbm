@@ -40,7 +40,7 @@ class TangentPredictorRobust(Predictor):
         # align predictor_vector with reference
         predictor_vector *= sign(vdot(reference_direction, predictor_vector))
         # scale to match step length
-        return predictor_vector * step_length
+        return predictor_vector
     
     @staticmethod
     def filter_directions(predictor_vector: np.ndarray, 
@@ -120,7 +120,35 @@ class TangentPredictorTwo(Predictor):
         # scale to match step length
         return predictor_vector
 
-#%%    
+class TangentPredictorBordered(Predictor):
+    """Keller (1983) §6: tangent from the bordered system.
+    Solve  [A  B; ṫ_prevᵀ]  [t_x; t_λ]  =  [0; 1]
+    where ṫ_prev is the previous tangent. Stable when A becomes
+    rank-deficient at limit points."""
+    autonomous = False
+
+    @staticmethod
+    def compute_predictor_vector(jacobian, reference_direction, **_):
+        # jacobian = [∂r/∂x_r | ∂r/∂ω], shape (N, N+1)
+        # reference_direction = previous tangent, shape (N+1, 1)
+        n_plus_one = jacobian.shape[1]
+        bordered = np.vstack((jacobian, reference_direction.T))  # (N+1, N+1)
+
+        rhs = np.zeros((n_plus_one, 1))
+        rhs[-1, 0] = 1.0
+
+        try:
+            tangent = np.linalg.solve(bordered, rhs)
+        except np.linalg.LinAlgError:
+            return None    # 𝒜 itself singular: true bifurcation, fall through
+
+        tangent /= np.linalg.norm(tangent)
+        tangent *= np.sign(np.vdot(reference_direction, tangent))
+        return tangent
+
+
+
+#%%
 
 class StepLengthAdaptation(object):
     def update_step_length() -> int:
