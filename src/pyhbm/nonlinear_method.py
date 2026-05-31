@@ -36,6 +36,18 @@ class NonlinearMethod(ABC):
 class AFT(NonlinearMethod):
     """Alternating Frequency-Time (AFT) scheme."""
 
+    def __init__(self):
+        self._harmonics_term = None       # cached kron(diag(harmonics), eye(dim))
+        self._harmonics_term_key = None
+
+    def _get_harmonics_term(self, dim):
+        """Cached kron(diag(Fourier.harmonics), eye(dim))."""
+        key = (tuple(Fourier.harmonics), dim)
+        if self._harmonics_term_key != key:
+            self._harmonics_term = kron(diag(Fourier.harmonics), eye(dim))
+            self._harmonics_term_key = key
+        return self._harmonics_term
+
     def _get_nonlinear_term(self, x: FourierOmegaPoint, ode) -> Fourier_Real:
         if x.nonlinear_term_cache is None:
             Fourier_Real.compute_time_series(x.fourier)
@@ -65,8 +77,7 @@ class AFT(NonlinearMethod):
         )
         G    = JacobianFourier_Real.new_from_time_series(dfnldq_ts)
         Gdot = self._get_Gdot(x, ode)
-        harmonics_term = kron(diag(Fourier.harmonics), eye(ode.dimension))
-        col_scale = x.omega * harmonics_term
+        col_scale = x.omega * self._get_harmonics_term(ode.dimension)
         return JacobianFourier_Real(
             RR=G.RR + Gdot.RI @ col_scale,
             RI=G.RI - Gdot.RR @ col_scale,
@@ -131,6 +142,9 @@ class DLFTContact(NonlinearMethod):
         self._problem       = None            # populated by bind()
         self._sigma         = None            # cached Lanczos factors σ_n
         self._sigma_key     = None            # (harmonics, H, m, C_H) the cache was built for
+        self._sigma_kron     = None           # cached kron(diag(σ), eye(n_int))
+        self._sigma_kron_key = None
+        self._eye_int        = None           # cached eye(Nh*n_int)
 
     def bind(self, problem) -> None:
         self._problem = problem
@@ -172,6 +186,22 @@ class DLFTContact(NonlinearMethod):
             return coefficients
         return coefficients * self._get_lanczos_sigma()[:, None, None]
 
+    def _get_sigma_kron(self, n_int):
+        """Cached Σ = kron(diag(σ_n), eye(n_int)) for the current harmonics set."""
+        sigma = self._get_lanczos_sigma()
+        key = (self._sigma_key, n_int)
+        if self._sigma_kron_key != key:
+            self._sigma_kron = kron(diag(sigma), eye(n_int))
+            self._sigma_kron_key = key
+        return self._sigma_kron
+
+    def _get_eye_complex_int(self, n_int):
+        """Cached eye(Nh*n_int)."""
+        dim = Fourier.number_of_harmonics * n_int
+        if self._eye_int is None or self._eye_int.shape[0] != dim:
+            self._eye_int = eye(dim)
+        return self._eye_int
+
     # --- internal helpers (use self._problem) ---
 
     def _get_Yr(self, x):
@@ -207,10 +237,14 @@ class DLFTContact(NonlinearMethod):
         return x.lambda_corrected
 
     def _invert_Yr_blockwise(self, Yr, n_int):
+        # Yr is block-diagonal (Nh blocks of n_int x n_int); invert all blocks at once.
+        Nh = Fourier.number_of_harmonics
+        idx = np.arange(Nh)
+        diag_blocks = Yr.reshape(Nh, n_int, Nh, n_int)[idx, :, idx, :]   # (Nh, n_int, n_int)
+        inv_blocks = np.linalg.solve(
+            diag_blocks, np.broadcast_to(eye(n_int), (Nh, n_int, n_int)))
         Zr = zeros_like(Yr)
-        for k in range(Fourier.number_of_harmonics):
-            s = slice(k * n_int, (k + 1) * n_int)
-            Zr[s, s] = np.linalg.solve(Yr[s, s], eye(n_int))
+        Zr.reshape(Nh, n_int, Nh, n_int)[idx, :, idx, :] = inv_blocks
         return Zr
 
     # --- NonlinearMethod interface ---
@@ -225,30 +259,27 @@ class DLFTContact(NonlinearMethod):
         J_mask    = JacobianFourier_Real.new_from_time_series(contact_tangent)
         if self.lanczos_m != 0.0:
             # filter the forward DFT (output harmonics): Σ Γ⁺ diag(m) Γ
-            Sigma = kron(diag(self._get_lanczos_sigma()), eye(n_int))
+            Sigma = self._get_sigma_kron(n_int)
             J_mask_RI = block([[Sigma @ J_mask.RR, Sigma @ J_mask.RI],
                                [Sigma @ J_mask.IR, Sigma @ J_mask.II]])
         else:
             J_mask_RI = block([[J_mask.RR, J_mask.RI], [J_mask.IR, J_mask.II]])
         Yr = self._get_Yr(x)
         Zr = self._invert_Yr_blockwise(Yr, n_int)
-        complex_int_dim = Fourier.number_of_harmonics * n_int
-        M    = self.epsilon * eye(complex_int_dim) - Zr
+        M    = self.epsilon * self._get_eye_complex_int(n_int) - Zr
         M_RI = block([[M.real, -M.imag], [M.imag, M.real]])
         return J_mask_RI @ M_RI
 
     def compute_dF_int_domega_RI(self, x: FourierOmegaPoint, ode) -> np.ndarray:
         problem = self._problem
-        Y   = problem._get_FRF(x)
-        dY  = problem.frf_provider.compute_FRF_derivative(
-                  x.omega, Fourier.harmonics, problem.d_total, Y)
-        BdY    = problem.B_fourier @ dY
+        factor = problem._get_factor(x)
         Yr     = self._get_Yr(x)
         Zr_rhs = self._get_Zr_rhs(x)
         n_int  = ode.dimension
-        dlambda_pred = np.linalg.solve(
-            Yr, BdY @ (problem.F_ext_full - problem.B_fourier.T @ Zr_rhs)
-        )
+        # B dY u, matrix-free: u complex, then B @ (dY @ u).
+        u = problem.F_ext_full - problem.B_fourier.T @ Zr_rhs
+        BdY_u = problem.B_fourier @ factor.apply_derivative(u)
+        dlambda_pred = np.linalg.solve(Yr, BdY_u)
         dlambda_pred_fourier = Fourier(
             dlambda_pred.reshape(Fourier.number_of_harmonics, n_int, 1)
         )

@@ -29,6 +29,11 @@ class NewtonRaphson(object):
 		if self.stagnation_tolerance > 0:
 			return norm(self.delta) < self.stagnation_tolerance * norm(self.x)
 		return False
+	# NOTE: a small step alone does not imply a solution. With a stiff Jacobian
+	# (e.g. a penalty ~ epsilon) the Newton step delta = J^-1 r can be tiny while
+	# the residual r is still large. Whether a stalled step counts as success is
+	# therefore gated on is_converged() in solve(); a stall that is not converged
+	# is reported as a failure, not a false success.
 	
 	def update_jacobian(self, iteration: int):
 		if self._should_update_jacobian(iteration):
@@ -94,8 +99,11 @@ class NewtonRaphson(object):
 			self.update_solution()
 
 			if self.is_stagnated():
-				return self.get_converged_result(iteration, return_jacobian)
-		
+				self.residue = self.compute_residue(self.x)
+				if self.is_converged():
+					return self.get_converged_result(iteration, return_jacobian)
+				return self.get_failed_result(return_jacobian)
+
 		print(f"Newton-Raphson: maximum iterations reached ({self.maximum_iterations})")
 		return self.get_failed_result(return_jacobian)
 

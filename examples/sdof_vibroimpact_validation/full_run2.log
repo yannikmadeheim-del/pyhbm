@@ -1,0 +1,348 @@
+======================================================================
+Finite-difference check of DLFT residual Jacobian
+======================================================================
+  Test point: ω = 1.0, |Q1| = 0.500, g0 = 0.1
+  ||r0|| = 5.502e+04   (not a solution -- irrelevant for FD test)
+
+  shape J            = (60, 60)
+  max |J_analytic|   = 2.955e+02
+  max |J_fd|         = 2.955e+02
+  max abs error      = 1.704e-04
+  max rel error      = 2.996e-03   (where abs error > 1e-8)
+
+  top 5 disagreements:
+    [ 31, 23]  analytic = +9.4875e+00   fd = +9.4876e+00   err = 1.70e-04
+    [ 31, 11]  analytic = -2.9268e+01   fd = -2.9268e+01   err = 1.64e-04
+    [ 31, 39]  analytic = -1.9965e-01   fd = -1.9951e-01   err = 1.48e-04
+    [ 31, 24]  analytic = -5.9386e+01   fd = -5.9386e+01   err = 1.40e-04
+    [ 31, 56]  analytic = -7.6552e+00   fd = -7.6551e+00   err = 1.40e-04
+======================================================================
+Finite-difference check of ∂r/∂ω
+======================================================================
+  shape           = (60, 1)
+  max |∂r/∂ω_an|  = 2.197e+06
+  max |∂r/∂ω_fd|  = 2.197e+06
+  max abs error   = 3.508e-03
+  max rel error   = 3.469e-09   (where abs error > 1e-8)
+
+  top 5 disagreements:
+    [  1]  analytic = -2.1967e+06   fd = -2.1967e+06   err = 3.51e-03
+    [ 31]  analytic = +5.1255e+04   fd = +5.1255e+04   err = 1.78e-04
+    [  0]  analytic = +9.1370e+02   fd = +9.1370e+02   err = 1.86e-07
+    [  2]  analytic = +1.1729e+03   fd = +1.1729e+03   err = 1.05e-07
+    [ 32]  analytic = +5.7898e+01   fd = +5.7898e+01   err = 8.90e-09
+======================================================================
+
+======================================================================
+ε-sweep continuation
+======================================================================
+
+Phase 1 (cold start) at ε = 1.0e+01
+progress 0.096 % 	iterations 1 	Δω 1.92e-02progress 0.847 % 	iterations 2 	Δω 1.91e-02progress 2.615 % 	iterations 2 	Δω 1.84e-02progress 4.246 % 	iterations 2 	Δω 1.70e-02progress 5.755 % 	iterations 2 	Δω 1.57e-02progress 7.159 % 	iterations 2 	Δω 1.45e-02progress 8.468 % 	iterations 2 	Δω 1.35e-02progress 9.693 % 	iterations 2 	Δω 1.27e-02progress 10.842 % 	iterations 2 	Δω 1.19e-02progress 11.923 % 	iterations 2 	Δω 1.11e-02progress 12.943 % 	iterations 2 	Δω 1.05e-02progress 13.906 % 	iterations 2 	Δω 9.90e-03progress 14.817 % 	iterations 2 	Δω 9.37e-03progress 15.682 % 	iterations 2 	Δω 8.87e-03progress 16.503 % 	iterations 2 	Δω 8.42e-03progress 17.284 % 	iterations 2 	Δω 8.00e-03progress 18.028 % 	iterations 2 	Δω 7.62e-03progress 18.738 % 	iterations 2 	Δω 7.26e-03progress 19.415 % 	iterations 2 	Δω 6.93e-03progress 20.063 % 	iterations 2 	Δω 6.63e-03progress 20.684 % 	iterations 2 	Δω 6.34e-03progress 21.278 % 	iterations 2 	Δω 6.07e-03progress 21.848 % 	iterations 2 	Δω 5.82e-03progress 22.396 % 	iterations 2 	Δω 5.59e-03progress 22.922 % 	iterations 2 	Δω 5.37e-03progress 23.428 % 	iterations 2 	Δω 5.16e-03progress 23.915 % 	iterations 2 	Δω 4.96e-03progress 24.384 % 	iterations 2 	Δω 4.78e-03progress 24.837 % 	iterations 2 	Δω 4.61e-03progress 25.273 % 	iterations 2 	Δω 4.44e-03progress 25.695 % 	iterations 2 	Δω 4.29e-03progress 26.102 % 	iterations 2 	Δω 4.14e-03progress 26.495 % 	iterations 2 	Δω 4.00e-03progress 26.876 % 	iterations 2 	Δω 3.87e-03progress 27.244 % 	iterations 2 	Δω 3.74e-03progress 27.601 % 	iterations 2 	Δω 3.62e-03progress 27.947 % 	iterations 2 	Δω 3.51e-03progress 28.282 % 	iterations 2 	Δω 3.40e-03progress 28.607 % 	iterations 2 	Δω 3.30e-03progress 28.922 % 	iterations 2 	Δω 3.20e-03progress 29.229 % 	iterations 2 	Δω 3.11e-03progress 29.526 % 	iterations 2 	Δω 3.02e-03progress 29.815 % 	iterations 2 	Δω 2.93e-03progress 30.096 % 	iterations 2 	Δω 2.85e-03progress 30.369 % 	iterations 2 	Δω 2.77e-03progress 30.635 % 	iterations 2 	Δω 2.70e-03progress 30.894 % 	iterations 2 	Δω 2.62e-03progress 31.146 % 	iterations 2 	Δω 2.55e-03progress 31.391 % 	iterations 2 	Δω 2.49e-03progress 31.630 % 	iterations 2 	Δω 2.42e-03progress 31.864 % 	iterations 2 	Δω 2.36e-03progress 32.091 % 	iterations 2 	Δω 2.30e-03progress 32.313 % 	iterations 2 	Δω 2.24e-03progress 32.529 % 	iterations 2 	Δω 2.19e-03progress 32.740 % 	iterations 2 	Δω 2.14e-03progress 32.946 % 	iterations 2 	Δω 2.09e-03progress 33.148 % 	iterations 2 	Δω 2.04e-03progress 33.344 % 	iterations 2 	Δω 1.99e-03progress 33.536 % 	iterations 2 	Δω 1.94e-03progress 33.724 % 	iterations 2 	Δω 1.90e-03progress 33.908 % 	iterations 2 	Δω 1.86e-03progress 34.088 % 	iterations 2 	Δω 1.82e-03progress 34.263 % 	iterations 2 	Δω 1.78e-03progress 34.435 % 	iterations 2 	Δω 1.74e-03progress 34.604 % 	iterations 2 	Δω 1.70e-03progress 34.768 % 	iterations 2 	Δω 1.66e-03progress 34.930 % 	iterations 2 	Δω 1.63e-03progress 35.088 % 	iterations 2 	Δω 1.60e-03progress 35.242 % 	iterations 2 	Δω 1.56e-03progress 35.394 % 	iterations 2 	Δω 1.53e-03progress 35.543 % 	iterations 2 	Δω 1.50e-03progress 35.688 % 	iterations 2 	Δω 1.47e-03progress 35.831 % 	iterations 2 	Δω 1.44e-03progress 35.971 % 	iterations 2 	Δω 1.41e-03progress 36.109 % 	iterations 2 	Δω 1.39e-03progress 36.243 % 	iterations 2 	Δω 1.36e-03progress 36.376 % 	iterations 2 	Δω 1.34e-03progress 36.506 % 	iterations 2 	Δω 1.31e-03progress 36.633 % 	iterations 2 	Δω 1.29e-03progress 36.758 % 	iterations 2 	Δω 1.26e-03progress 36.881 % 	iterations 2 	Δω 1.24e-03progress 37.002 % 	iterations 2 	Δω 1.22e-03progress 37.120 % 	iterations 2 	Δω 1.20e-03progress 37.237 % 	iterations 2 	Δω 1.17e-03progress 37.351 % 	iterations 2 	Δω 1.15e-03progress 37.463 % 	iterations 2 	Δω 1.13e-03progress 37.574 % 	iterations 2 	Δω 1.11e-03progress 37.683 % 	iterations 2 	Δω 1.10e-03progress 37.789 % 	iterations 2 	Δω 1.08e-03progress 37.894 % 	iterations 2 	Δω 1.06e-03progress 37.998 % 	iterations 2 	Δω 1.04e-03progress 38.099 % 	iterations 2 	Δω 1.02e-03progress 38.199 % 	iterations 2 	Δω 1.01e-03progress 38.298 % 	iterations 2 	Δω 9.92e-04progress 38.395 % 	iterations 2 	Δω 9.76e-04progress 38.490 % 	iterations 2 	Δω 9.61e-04progress 38.584 % 	iterations 2 	Δω 9.45e-04progress 38.676 % 	iterations 2 	Δω 9.31e-04progress 38.767 % 	iterations 2 	Δω 9.16e-04progress 38.857 % 	iterations 2 	Δω 9.02e-04progress 38.945 % 	iterations 2 	Δω 8.89e-04progress 39.032 % 	iterations 2 	Δω 8.75e-04progress 39.117 % 	iterations 2 	Δω 8.62e-04progress 39.202 % 	iterations 2 	Δω 8.50e-04progress 39.285 % 	iterations 2 	Δω 8.37e-04progress 39.367 % 	iterations 2 	Δω 8.25e-04progress 39.447 % 	iterations 2 	Δω 8.14e-04progress 39.527 % 	iterations 2 	Δω 8.03e-04progress 39.606 % 	iterations 2 	Δω 7.93e-04progress 39.685 % 	iterations 2 	Δω 7.86e-04progress 39.928 % 	iterations 4 	Δω 8.04e-04progress 40.267 % 	iterations 3 	Δω 3.44e-03progress 40.602 % 	iterations 2 	Δω 3.36e-03progress 40.936 % 	iterations 2 	Δω 3.34e-03progress 41.271 % 	iterations 2 	Δω 3.34e-03progress 41.605 % 	iterations 2 	Δω 3.35e-03progress 41.941 % 	iterations 2 	Δω 3.35e-03progress 42.277 % 	iterations 2 	Δω 3.36e-03progress 42.614 % 	iterations 2 	Δω 3.37e-03progress 42.951 % 	iterations 2 	Δω 3.37e-03progress 43.289 % 	iterations 2 	Δω 3.37e-03progress 43.627 % 	iterations 2 	Δω 3.38e-03progress 43.964 % 	iterations 2 	Δω 3.38e-03progress 44.302 % 	iterations 2 	Δω 3.38e-03progress 44.640 % 	iterations 2 	Δω 3.38e-03progress 44.977 % 	iterations 2 	Δω 3.37e-03progress 45.314 % 	iterations 2 	Δω 3.37e-03progress 45.650 % 	iterations 2 	Δω 3.37e-03progress 45.986 % 	iterations 2 	Δω 3.36e-03progress 46.320 % 	iterations 2 	Δω 3.35e-03progress 46.654 % 	iterations 2 	Δω 3.34e-03progress 46.987 % 	iterations 2 	Δω 3.33e-03progress 47.319 % 	iterations 2 	Δω 3.32e-03progress 47.650 % 	iterations 2 	Δω 3.31e-03progress 47.980 % 	iterations 2 	Δω 3.30e-03progress 48.308 % 	iterations 2 	Δω 3.29e-03progress 48.635 % 	iterations 2 	Δω 3.28e-03progress 48.960 % 	iterations 2 	Δω 3.26e-03progress 49.285 % 	iterations 2 	Δω 3.25e-03progress 49.607 % 	iterations 2 	Δω 3.23e-03progress 49.928 % 	iterations 2 	Δω 3.22e-03progress 50.248 % 	iterations 2 	Δω 3.20e-03progress 50.566 % 	iterations 2 	Δω 3.19e-03progress 50.882 % 	iterations 2 	Δω 3.17e-03progress 51.197 % 	iterations 2 	Δω 3.15e-03progress 51.509 % 	iterations 2 	Δω 3.14e-03progress 51.820 % 	iterations 2 	Δω 3.12e-03progress 52.130 % 	iterations 2 	Δω 3.10e-03progress 52.437 % 	iterations 2 	Δω 3.08e-03progress 52.743 % 	iterations 2 	Δω 3.07e-03progress 53.047 % 	iterations 2 	Δω 3.05e-03progress 53.349 % 	iterations 2 	Δω 3.03e-03progress 53.649 % 	iterations 2 	Δω 3.01e-03progress 53.948 % 	iterations 2 	Δω 2.99e-03progress 54.244 % 	iterations 2 	Δω 2.98e-03progress 54.539 % 	iterations 2 	Δω 2.96e-03progress 54.832 % 	iterations 2 	Δω 2.94e-03progress 55.123 % 	iterations 2 	Δω 2.92e-03progress 55.412 % 	iterations 2 	Δω 2.90e-03progress 55.700 % 	iterations 2 	Δω 2.88e-03progress 55.985 % 	iterations 2 	Δω 2.87e-03progress 56.269 % 	iterations 2 	Δω 2.85e-03progress 56.551 % 	iterations 2 	Δω 2.83e-03progress 56.831 % 	iterations 2 	Δω 2.81e-03progress 57.109 % 	iterations 2 	Δω 2.79e-03progress 57.385 % 	iterations 2 	Δω 2.77e-03progress 57.660 % 	iterations 2 	Δω 2.76e-03progress 57.932 % 	iterations 2 	Δω 2.74e-03progress 58.203 % 	iterations 2 	Δω 2.72e-03progress 58.472 % 	iterations 2 	Δω 2.70e-03progress 58.740 % 	iterations 2 	Δω 2.68e-03progress 59.005 % 	iterations 2 	Δω 2.67e-03progress 59.269 % 	iterations 2 	Δω 2.65e-03progress 59.531 % 	iterations 2 	Δω 2.63e-03progress 59.792 % 	iterations 2 	Δω 2.61e-03progress 60.050 % 	iterations 2 	Δω 2.60e-03progress 60.307 % 	iterations 2 	Δω 2.58e-03progress 60.562 % 	iterations 2 	Δω 2.56e-03progress 60.816 % 	iterations 2 	Δω 2.54e-03progress 61.068 % 	iterations 2 	Δω 2.53e-03progress 61.318 % 	iterations 2 	Δω 2.51e-03progress 61.566 % 	iterations 2 	Δω 2.49e-03progress 61.813 % 	iterations 2 	Δω 2.47e-03progress 62.059 % 	iterations 2 	Δω 2.46e-03progress 62.302 % 	iterations 2 	Δω 2.44e-03progress 62.544 % 	iterations 2 	Δω 2.43e-03progress 62.785 % 	iterations 2 	Δω 2.41e-03progress 63.024 % 	iterations 2 	Δω 2.40e-03progress 63.261 % 	iterations 2 	Δω 2.38e-03progress 63.497 % 	iterations 2 	Δω 2.37e-03progress 63.731 % 	iterations 2 	Δω 2.35e-03progress 63.964 % 	iterations 2 	Δω 2.34e-03progress 64.195 % 	iterations 2 	Δω 2.32e-03progress 64.425 % 	iterations 2 	Δω 2.31e-03progress 64.653 % 	iterations 2 	Δω 2.29e-03progress 64.880 % 	iterations 2 	Δω 2.27e-03progress 65.105 % 	iterations 2 	Δω 2.26e-03progress 65.329 % 	iterations 2 	Δω 2.24e-03progress 65.552 % 	iterations 2 	Δω 2.23e-03progress 65.773 % 	iterations 2 	Δω 2.22e-03progress 65.992 % 	iterations 2 	Δω 2.20e-03progress 66.211 % 	iterations 2 	Δω 2.19e-03progress 66.428 % 	iterations 2 	Δω 2.17e-03progress 66.643 % 	iterations 2 	Δω 2.16e-03progress 66.857 % 	iterations 2 	Δω 2.15e-03progress 67.070 % 	iterations 2 	Δω 2.13e-03progress 67.281 % 	iterations 2 	Δω 2.13e-03progress 67.491 % 	iterations 2 	Δω 2.11e-03progress 67.700 % 	iterations 2 	Δω 2.10e-03progress 67.908 % 	iterations 2 	Δω 2.08e-03progress 68.114 % 	iterations 2 	Δω 2.06e-03progress 68.319 % 	iterations 2 	Δω 2.05e-03progress 68.522 % 	iterations 2 	Δω 2.04e-03progress 68.725 % 	iterations 2 	Δω 2.03e-03progress 68.926 % 	iterations 2 	Δω 2.02e-03progress 69.126 % 	iterations 2 	Δω 2.00e-03progress 69.325 % 	iterations 2 	Δω 2.00e-03progress 69.522 % 	iterations 2 	Δω 1.98e-03progress 69.718 % 	iterations 2 	Δω 1.97e-03progress 69.913 % 	iterations 2 	Δω 1.96e-03progress 70.107 % 	iterations 2 	Δω 1.95e-03progress 70.300 % 	iterations 2 	Δω 1.93e-03progress 70.492 % 	iterations 2 	Δω 1.92e-03progress 70.682 % 	iterations 2 	Δω 1.90e-03progress 70.872 % 	iterations 2 	Δω 1.90e-03progress 71.060 % 	iterations 2 	Δω 1.88e-03progress 71.247 % 	iterations 2 	Δω 1.87e-03progress 71.433 % 	iterations 2 	Δω 1.87e-03progress 71.618 % 	iterations 2 	Δω 1.86e-03progress 71.801 % 	iterations 2 	Δω 1.85e-03progress 71.984 % 	iterations 2 	Δω 1.84e-03progress 72.166 % 	iterations 2 	Δω 1.82e-03progress 72.346 % 	iterations 2 	Δω 1.81e-03progress 72.526 % 	iterations 2 	Δω 1.80e-03progress 72.704 % 	iterations 2 	Δω 1.78e-03progress 72.882 % 	iterations 2 	Δω 1.78e-03progress 73.058 % 	iterations 2 	Δω 1.77e-03progress 73.233 % 	iterations 2 	Δω 1.76e-03progress 73.408 % 	iterations 2 	Δω 1.76e-03progress 73.581 % 	iterations 2 	Δω 1.74e-03progress 73.753 % 	iterations 2 	Δω 1.73e-03progress 73.925 % 	iterations 2 	Δω 1.72e-03progress 74.096 % 	iterations 3 	Δω 1.70e-03progress 74.265 % 	iterations 2 	Δω 1.69e-03progress 74.434 % 	iterations 2 	Δω 1.69e-03progress 74.601 % 	iterations 2 	Δω 1.67e-03progress 74.768 % 	iterations 2 	Δω 1.67e-03progress 74.933 % 	iterations 2 	Δω 1.67e-03progress 75.098 % 	iterations 2 	Δω 1.65e-03progress 75.262 % 	iterations 3 	Δω 1.65e-03progress 75.425 % 	iterations 2 	Δω 1.64e-03progress 75.587 % 	iterations 3 	Δω 1.62e-03progress 75.748 % 	iterations 2 	Δω 1.61e-03progress 75.908 % 	iterations 2 	Δω 1.60e-03progress 76.068 % 	iterations 2 	Δω 1.59e-03progress 76.226 % 	iterations 2 	Δω 1.59e-03progress 76.384 % 	iterations 2 	Δω 1.59e-03progress 76.541 % 	iterations 2 	Δω 1.57e-03progress 76.696 % 	iterations 3 	Δω 1.57e-03progress 76.851 % 	iterations 2 	Δω 1.56e-03progress 77.006 % 	iterations 3 	Δω 1.53e-03progress 77.159 % 	iterations 2 	Δω 1.54e-03progress 77.312 % 	iterations 2 	Δω 1.53e-03progress 77.464 % 	iterations 2 	Δω 1.52e-03progress 77.614 % 	iterations 2 	Δω 1.52e-03progress 77.765 % 	iterations 2 	Δω 1.51e-03progress 77.914 % 	iterations 2 	Δω 1.50e-03progress 78.062 % 	iterations 3 	Δω 1.50e-03progress 78.210 % 	iterations 2 	Δω 1.48e-03progress 78.358 % 	iterations 3 	Δω 1.46e-03progress 78.504 % 	iterations 2 	Δω 1.46e-03progress 78.649 % 	iterations 2 	Δω 1.46e-03progress 78.794 % 	iterations 2 	Δω 1.45e-03progress 78.938 % 	iterations 2 	Δω 1.45e-03progress 79.081 % 	iterations 3 	Δω 1.45e-03progress 79.223 % 	iterations 2 	Δω 1.43e-03progress 79.365 % 	iterations 2 	Δω 1.41e-03progress 79.506 % 	iterations 2 	Δω 1.41e-03progress 79.646 % 	iterations 3 	Δω 1.40e-03progress 79.786 % 	iterations 3 	Δω 1.39e-03progress 79.925 % 	iterations 3 	Δω 1.40e-03progress 80.063 % 	iterations 2 	Δω 1.39e-03progress 80.200 % 	iterations 2 	Δω 1.38e-03progress 80.337 % 	iterations 3 	Δω 1.38e-03progress 80.473 % 	iterations 2 	Δω 1.37e-03progress 80.608 % 	iterations 3 	Δω 1.34e-03progress 80.743 % 	iterations 2 	Δω 1.34e-03progress 80.877 % 	iterations 2 	Δω 1.35e-03progress 81.010 % 	iterations 2 	Δω 1.33e-03progress 81.143 % 	iterations 2 	Δω 1.33e-03progress 81.274 % 	iterations 3 	Δω 1.34e-03progress 81.406 % 	iterations 2 	Δω 1.32e-03progress 81.537 % 	iterations 3 	Δω 1.30e-03progress 81.667 % 	iterations 2 	Δω 1.30e-03progress 81.796 % 	iterations 2 	Δω 1.29e-03progress 81.925 % 	iterations 3 	Δω 1.28e-03progress 82.053 % 	iterations 2 	Δω 1.29e-03progress 82.180 % 	iterations 3 	Δω 1.29e-03progress 82.307 % 	iterations 2 	Δω 1.28e-03progress 82.433 % 	iterations 2 	Δω 1.26e-03progress 82.559 % 	iterations 2 	Δω 1.26e-03progress 82.684 % 	iterations 3 	Δω 1.24e-03progress 82.809 % 	iterations 3 	Δω 1.23e-03progress 82.932 % 	iterations 2 	Δω 1.24e-03progress 83.055 % 	iterations 3 	Δω 1.24e-03progress 83.178 % 	iterations 2 	Δω 1.23e-03progress 83.300 % 	iterations 2 	Δω 1.23e-03progress 83.421 % 	iterations 3 	Δω 1.23e-03progress 83.542 % 	iterations 3 	Δω 1.20e-03progress 83.663 % 	iterations 3 	Δω 1.18e-03progress 83.782 % 	iterations 2 	Δω 1.20e-03progress 83.901 % 	iterations 2 	Δω 1.20e-03progress 84.020 % 	iterations 2 	Δω 1.19e-03progress 84.138 % 	iterations 2 	Δω 1.19e-03progress 84.255 % 	iterations 3 	Δω 1.19e-03progress 84.372 % 	iterations 2 	Δω 1.17e-03progress 84.489 % 	iterations 3 	Δω 1.14e-03progress 84.604 % 	iterations 2 	Δω 1.16e-03progress 84.720 % 	iterations 2 	Δω 1.16e-03progress 84.834 % 	iterations 2 	Δω 1.15e-03progress 84.948 % 	iterations 2 	Δω 1.14e-03progress 85.062 % 	iterations 3 	Δω 1.15e-03progress 85.175 % 	iterations 3 	Δω 1.14e-03progress 85.288 % 	iterations 3 	Δω 1.12e-03progress 85.400 % 	iterations 3 	Δω 1.11e-03progress 85.511 % 	iterations 2 	Δω 1.12e-03progress 85.623 % 	iterations 2 	Δω 1.11e-03progress 85.733 % 	iterations 3 	Δω 1.10e-03progress 85.843 % 	iterations 3 	Δω 1.12e-03progress 85.952 % 	iterations 3 	Δω 1.11e-03progress 86.062 % 	iterations 2 	Δω 1.10e-03progress 86.170 % 	iterations 3 	Δω 1.06e-03progress 86.278 % 	iterations 2 	Δω 1.08e-03progress 86.386 % 	iterations 2 	Δω 1.08e-03progress 86.493 % 	iterations 3 	Δω 1.07e-03progress 86.600 % 	iterations 2 	Δω 1.07e-03progress 86.706 % 	iterations 3 	Δω 1.08e-03progress 86.811 % 	iterations 3 	Δω 1.07e-03progress 86.917 % 	iterations 3 	Δω 1.05e-03progress 87.021 % 	iterations 3 	Δω 1.03e-03progress 87.126 % 	iterations 2 	Δω 1.04e-03progress 87.230 % 	iterations 2 	Δω 1.03e-03progress 87.333 % 	iterations 3 	Δω 1.03e-03progress 87.436 % 	iterations 3 	Δω 1.04e-03progress 87.538 % 	iterations 3 	Δω 1.04e-03progress 87.640 % 	iterations 3 	Δω 1.03e-03progress 87.742 % 	iterations 3 	Δω 1.00e-03progress 87.843 % 	iterations 2 	Δω 1.01e-03progress 87.943 % 	iterations 2 	Δω 1.01e-03progress 88.044 % 	iterations 3 	Δω 9.97e-04progress 88.144 % 	iterations 3 	Δω 9.91e-04progress 88.243 % 	iterations 3 	Δω 1.01e-03progress 88.341 % 	iterations 3 	Δω 1.01e-03progress 88.440 % 	iterations 3 	Δω 9.96e-04progress 88.538 % 	iterations 3 	Δω 9.60e-04progress 88.636 % 	iterations 2 	Δω 9.74e-04progress 88.733 % 	iterations 2 	Δω 9.73e-04progress 88.830 % 	iterations 3 	Δω 9.64e-04progress 88.926 % 	iterations 3 	Δω 9.57e-04progress 89.022 % 	iterations 3 	Δω 9.77e-04progress 89.117 % 	iterations 4 	Δω 9.75e-04progress 89.212 % 	iterations 3 	Δω 9.63e-04progress 89.308 % 	iterations 3 	Δω 9.25e-04progress 89.402 % 	iterations 2 	Δω 9.37e-04progress 89.496 % 	iterations 2 	Δω 9.42e-04progress 89.589 % 	iterations 2 	Δω 9.34e-04progress 89.683 % 	iterations 3 	Δω 9.26e-04progress 89.775 % 	iterations 3 	Δω 9.40e-04progress 89.867 % 	iterations 4 	Δω 9.45e-04progress 89.959 % 	iterations 3 	Δω 9.35e-04progress 90.051 % 	iterations 3 	Δω 9.00e-04progress 90.142 % 	iterations 3 	Δω 8.85e-04progress 90.233 % 	iterations 2 	Δω 9.13e-04progress 90.324 % 	iterations 2 	Δω 9.07e-04progress 90.414 % 	iterations 2 	Δω 8.98e-04progress 90.503 % 	iterations 2 	Δω 8.97e-04progress 90.592 % 	iterations 4 	Δω 9.16e-04progress 90.681 % 	iterations 4 	Δω 9.09e-04progress 90.770 % 	iterations 2 	Δω 8.86e-04progress 90.859 % 	iterations 4 	Δω 8.42e-04progress 90.946 % 	iterations 2 	Δω 8.76e-04progress 91.034 % 	iterations 2 	Δω 8.82e-04progress 91.121 % 	iterations 2 	Δω 8.75e-04progress 91.208 % 	iterations 2 	Δω 8.67e-04progress 91.294 % 	iterations 3 	Δω 8.71e-04progress 91.380 % 	iterations 4 	Δω 8.85e-04progress 91.465 % 	iterations 3 	Δω 8.72e-04progress 91.551 % 	iterations 3 	Δω 8.35e-04progress 91.637 % 	iterations 4 	Δω 8.08e-04progress 91.721 % 	iterations 2 	Δω 8.51e-04progress 91.805 % 	iterations 3 	Δω 8.54e-04progress 91.889 % 	iterations 2 	Δω 8.47e-04progress 91.973 % 	iterations 2 	Δω 8.39e-04progress 92.056 % 	iterations 3 	Δω 8.39e-04progress 92.139 % 	iterations 4 	Δω 8.53e-04progress 92.222 % 	iterations 3 	Δω 8.37e-04progress 92.304 % 	iterations 3 	Δω 8.02e-04progress 92.387 % 	iterations 4 	Δω 7.80e-04progress 92.468 % 	iterations 2 	Δω 8.15e-04progress 92.549 % 	iterations 3 	Δω 8.28e-04progress 92.630 % 	iterations 3 	Δω 8.22e-04progress 92.711 % 	iterations 2 	Δω 8.15e-04progress 92.792 % 	iterations 2 	Δω 8.07e-04progress 92.871 % 	iterations 3 	Δω 8.19e-04progress 92.951 % 	iterations 3 	Δω 8.09e-04progress 93.031 % 	iterations 3 	Δω 7.81e-04progress 93.110 % 	iterations 3 	Δω 7.60e-04progress 93.189 % 	iterations 4 	Δω 7.57e-04progress 93.267 % 	iterations 3 	Δω 7.99e-04progress 93.345 % 	iterations 3 	Δω 7.99e-04progress 93.423 % 	iterations 3 	Δω 7.93e-04progress 93.501 % 	iterations 3 	Δω 7.85e-04progress 93.578 % 	iterations 2 	Δω 7.75e-04progress 93.655 % 	iterations 3 	Δω 7.81e-04progress 93.732 % 	iterations 2 	Δω 7.66e-04progress 93.808 % 	iterations 3 	Δω 7.48e-04progress 93.885 % 	iterations 3 	Δω 7.34e-04progress 93.961 % 	iterations 4 	Δω 7.32e-04progress 94.036 % 	iterations 3 	Δω 7.72e-04progress 94.111 % 	iterations 4 	Δω 7.73e-04progress 94.185 % 	iterations 4 	Δω 7.68e-04progress 94.260 % 	iterations 3 	Δω 7.60e-04progress 94.335 % 	iterations 2 	Δω 7.45e-04progress 94.409 % 	iterations 3 	Δω 7.30e-04progress 94.482 % 	iterations 2 	Δω 7.37e-04progress 94.556 % 	iterations 3 	Δω 7.26e-04progress 94.630 % 	iterations 3 	Δω 7.14e-04progress 94.703 % 	iterations 3 	Δω 7.04e-04progress 94.775 % 	iterations 2 	Δω 7.23e-04progress 94.847 % 	iterations 4 	Δω 7.47e-04progress 94.919 % 	iterations 4 	Δω 7.45e-04progress 94.991 % 	iterations 4 	Δω 7.38e-04progress 95.062 % 	iterations 3 	Δω 7.28e-04progress 95.134 % 	iterations 3 	Δω 6.98e-04progress 95.205 % 	iterations 3 	Δω 6.92e-04progress 95.276 % 	iterations 2 	Δω 7.07e-04progress 95.346 % 	iterations 2 	Δω 6.98e-04progress 95.417 % 	iterations 3 	Δω 6.88e-04progress 95.487 % 	iterations 3 	Δω 6.79e-04progress 95.557 % 	iterations 3 	Δω 6.86e-04progress 95.626 % 	iterations 4 	Δω 7.19e-04progress 95.694 % 	iterations 4 	Δω 7.18e-04progress 95.763 % 	iterations 4 	Δω 7.13e-04progress 95.832 % 	iterations 4 	Δω 7.05e-04progress 95.901 % 	iterations 3 	Δω 6.82e-04progress 95.969 % 	iterations 5 	Δω 6.19e-04progress 96.003 % 	iterations 2 	Δω 6.75e-04progress 96.071 % 	iterations 2 	Δω 6.84e-04progress 96.138 % 	iterations 2 	Δω 6.77e-04progress 96.205 % 	iterations 4 	Δω 6.91e-04progress 96.272 % 	iterations 4 	Δω 6.98e-04progress 96.338 % 	iterations 3 	Δω 6.82e-04progress 96.405 % 	iterations 3 	Δω 6.48e-04progress 96.472 % 	iterations 4 	Δω 6.17e-04progress 96.539 % 	iterations 4 	Δω 5.99e-04progress 96.604 % 	iterations 3 	Δω 6.41e-04progress 96.669 % 	iterations 3 	Δω 6.73e-04progress 96.734 % 	iterations 3 	Δω 6.71e-04progress 96.799 % 	iterations 3 	Δω 6.65e-04progress 96.864 % 	iterations 3 	Δω 6.58e-04progress 96.929 % 	iterations 2 	Δω 6.51e-04progress 96.993 % 	iterations 2 	Δω 6.46e-04progress 97.057 % 	iterations 4 	Δω 6.65e-04progress 97.120 % 	iterations 4 	Δω 6.68e-04progress 97.184 % 	iterations 3 	Δω 6.53e-04progress 97.247 % 	iterations 3 	Δω 6.21e-04progress 97.311 % 	iterations 4 	Δω 5.86e-04progress 97.375 % 	iterations 5 	Δω 5.61e-04progress 97.405 % 	iterations 3 	Δω 5.71e-04progress 97.467 % 	iterations 5 	Δω 6.52e-04progress 97.500 % 	iterations 2 	Δω 6.43e-04progress 97.561 % 	iterations 3 	Δω 6.41e-04progress 97.623 % 	iterations 3 	Δω 6.37e-04progress 97.685 % 	iterations 3 	Δω 6.31e-04progress 97.747 % 	iterations 2 	Δω 6.24e-04progress 97.808 % 	iterations 2 	Δω 6.16e-04progress 97.869 % 	iterations 2 	Δω 6.12e-04progress 97.930 % 	iterations 4 	Δω 6.32e-04progress 97.990 % 	iterations 6 	Δω 6.42e-04progress 98.006 % 	iterations 2 	Δω 6.37e-04progress 98.066 % 	iterations 5 	Δω 6.35e-04progress 98.096 % 	iterations 4 	Δω 6.37e-04progress 98.126 % 	iterations 4 	Δω 5.42e-04progress 98.157 % 	iterations 3 	Δω 6.33e-04progress 98.217 % 	iterations 4 	Δω 5.44e-04progress 98.276 % 	iterations 3 	Δω 6.05e-04progress 98.335 % 	iterations 3 	Δω 6.18e-04progress 98.394 % 	iterations 3 	Δω 6.15e-04progress 98.453 % 	iterations 3 	Δω 6.10e-04progress 98.512 % 	iterations 3 	Δω 6.04e-04progress 98.570 % 	iterations 3 	Δω 5.97e-04progress 98.629 % 	iterations 2 	Δω 5.89e-04progress 98.687 % 	iterations 2 	Δω 5.83e-04progress 98.745 % 	iterations 3 	Δω 5.94e-04progress 98.802 % 	iterations 6 	Δω 6.12e-04progress 98.818 % 	iterations 2 	Δω 6.11e-04progress 98.875 % 	iterations 3 	Δω 5.93e-04progress 98.932 % 	iterations 5 	Δω 6.09e-04progress 98.960 % 	iterations 4 	Δω 6.08e-04progress 98.988 % 	iterations 4 	Δω 5.03e-04progress 99.018 % 	iterations 4 	Δω 6.04e-04progress 99.045 % 	iterations 3 	Δω 5.04e-04progress 99.101 % 	iterations 5 	Δω 5.99e-04progress 99.131 % 	iterations 2 	Δω 5.92e-04progress 99.187 % 	iterations 3 	Δω 5.87e-04progress 99.243 % 	iterations 3 	Δω 5.86e-04progress 99.298 % 	iterations 3 	Δω 5.82e-04progress 99.354 % 	iterations 3 	Δω 5.76e-04progress 99.410 % 	iterations 3 	Δω 5.69e-04progress 99.465 % 	iterations 2 	Δω 5.62e-04progress 99.520 % 	iterations 2 	Δω 5.54e-04progress 99.576 % 	iterations 2 	Δω 5.46e-04progress 99.630 % 	iterations 2 	Δω 5.47e-04progress 99.685 % 	iterations 4 	Δω 5.71e-04progress 99.739 % 	iterations 6 	Δω 5.83e-04progress 99.753 % 	iterations 2 	Δω 5.83e-04progress 99.807 % 	iterations 3 	Δω 5.49e-04progress 99.861 % 	iterations 4 	Δω 5.72e-04progress 99.914 % 	iterations 5 	Δω 5.74e-04progress 99.940 % 	iterations 6 	Δω 5.72e-04progress 99.946 % 	iterations 2 	Δω 4.23e-04progress 99.974 % 	iterations 4 	Δω 5.10e-04progress 99.999 % 	iterations 6 	Δω 5.66e-04progress 100.006 % 	iterations 3 	Δω 4.52e-04
+Terminate: outside frequency range after 525 solutions
+Total solving time: 7.1283674240112305 seconds
+  -> 525 points, ω range [0.5000, 1.5001]
+
+Phase 2: warm-start at ε = 1.0e+02
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+  -> kept 417 (108 failures), ω range [0.5000, 1.5001]
+
+Phase 2: warm-start at ε = 1.0e+03
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+  -> kept 365 (52 failures), ω range [0.5000, 1.5001]
+
+Phase 2: warm-start at ε = 1.0e+04
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+  -> kept 304 (61 failures), ω range [0.5000, 1.4813]
+
+Phase 2: warm-start at ε = 1.0e+05
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+Newton-Raphson: maximum iterations reached (300)
+  -> kept 272 (32 failures), ω range [0.5000, 1.4813]
+
+Final solution set at ε = 1.0e+05: 272 points
+Total ε-sweep time: 699.84 s
+
+Solution set: 272 points
+ω range: [0.5000, 1.4813]
+  ω in [0.5, 1.0): 142
+  ω in [1.0, 1.5): 130
+  ω >= 1.5       : 0
+
+Last 10 continuation points:
+  ω             iter   step_length
+      1.367056     3   0.00e+00
+      1.392124    19   0.00e+00
+      1.394018     4   0.00e+00
+      1.407700   165   0.00e+00
+      1.451342     3   0.00e+00
+      1.466693     3   0.00e+00
+      1.468641     3   0.00e+00
+      1.469933     3   0.00e+00
+      1.471204     3   0.00e+00
+      1.481259     4   0.00e+00
+
+Residual norms in contact regime (145 points, showing up to 10):
+  ω = 0.9531   ||r|| = 2.030e-10
+  ω = 0.9993   ||r|| = 4.895e-06
+  ω = 1.0424   ||r|| = 2.233e-10
+  ω = 1.0820   ||r|| = 3.664e-05
+  ω = 1.1206   ||r|| = 2.684e-08
+  ω = 1.1599   ||r|| = 1.479e-10
+  ω = 1.1932   ||r|| = 6.559e-05
+  ω = 1.2375   ||r|| = 9.421e-11
+  ω = 1.2670   ||r|| = 5.470e-06
+  ω = 1.3449   ||r|| = 3.795e-07
+  ω = 1.4667   ||r|| = 2.232e-06
+
+Figure saved: C:\Users\yanni\Desktop\TUM\Bachelorarbeit\Fast_numerical_solution_for_nonlinear_FE_dynamics\code\pyhbm\examples\sdof_vibroimpact_validation\comparison_dlft_vs_nlvib.png
+C:\Users\yanni\Desktop\TUM\Bachelorarbeit\Fast_numerical_solution_for_nonlinear_FE_dynamics\code\pyhbm\examples\sdof_vibroimpact_validation\main.py:379: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()

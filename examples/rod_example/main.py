@@ -15,7 +15,12 @@ Model (Fig. 6, Eq. 43):
 import sys
 from pathlib import Path
 
-from pyhbm.numerical_continuation.corrector_step import ArcLengthParameterization
+from pyhbm.numerical_continuation.corrector_step import (
+    ArcLengthParameterization, OrthogonalParameterization,
+)
+from pyhbm.numerical_continuation.predictor_step import (
+    TangentPredictorOne, TangentPredictorBordered,
+)
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
@@ -69,8 +74,8 @@ class RodVibroImpact(FBS_System):
         # FRF in w, so the arc-length stepper sees an O(1) frequency axis. ---
         omega_ref = omega_modes[0]
         self.omega_ref        = omega_ref
-        self.mass_matrix      = M
-        self.damping_matrix   = C
+        self.mass_matrix      = omega_ref ** 2 * M
+        self.damping_matrix   = omega_ref      * C
         self.stiffness_matrix = K
 
         B = zeros((1, n))                # select free end (last DOF) as interface
@@ -116,8 +121,8 @@ OMEGA_1 = rod.omega_modes[0]
 print(f"first axial mode: omega_1 = {OMEGA_1:.1f} rad/s  ({OMEGA_1/2/np.pi:.1f} Hz)")
 
 # continuation runs in the nondimensional frequency w_hat = w / omega_1
-OMEGA_START = 1900        # w_hat
-OMEGA_END   = 3400        # w_hat
+OMEGA_START = 1900 / OMEGA_1     # w_hat  (physical 1900 rad/s)
+OMEGA_END   = 3400 / OMEGA_1     # w_hat  (physical 3400 rad/s)
 
 
 # ============================ build problem =================================
@@ -180,7 +185,7 @@ print(f"linear free-end amplitude at omega_start: {Q1_start:.3e} m  (gap d = {GA
 
 # ============================ continuation ==================================
 
-solver_kwargs = {"maximum_iterations": 200, "absolute_tolerance": 1e-6}
+solver_kwargs = {"maximum_iterations": 300, "absolute_tolerance": 1e-6}
 step_kwargs = {
     "base":                      2.0,
     "initial_step_length":       0.005,
@@ -189,16 +194,23 @@ step_kwargs = {
     "goal_number_of_iterations": 4,
 }
 
-def run_frc(lanczos_m, label):
-    """One continuation sweep; returns (omega_phys, peak_uB) along the branch.
+def run_frc(lanczos_m, label,
+            parameterization=OrthogonalParameterization,
+            predictor=TangentPredictorBordered,
+            verbose_points=True):
+    """One continuation sweep; returns (omega_phys, peak_uB, info) along the branch.
 
     peak_uB = ||x_100(t)||_inf, the infinity-norm (max over a period) of the
     free-end displacement -- the quantity plotted in the paper's Fig. 9.
+    info = dict(n_points, omega_max, traversed, max_iterations, wall_time):
+    fold-traversal diagnostics for the parameterization x predictor comparison.
     """
     contact_l = DLFTContact(epsilon=EPSILON, g_zero=GAP, gamma=GAMMA,
                             lanczos_m=lanczos_m, lanczos_cutoff=LANCZOS_CUTOFF)
     prob_l   = FBSProblem(rod, provider, contact_l)
-    solver_l = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=prob_l, corrector_parameterization=ArcLengthParameterization)
+    solver_l = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=prob_l,
+                                     corrector_parameterization=parameterization,
+                                     predictor=predictor)
 
     Q1_l = np.array([[linear_free_end(OMEGA_START)]])
     ig   = FourierOmegaPoint.new_from_first_harmonic(Q1_l, omega=OMEGA_START)

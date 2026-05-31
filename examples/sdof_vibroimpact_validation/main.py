@@ -13,6 +13,9 @@ from pyhbm.numerical_continuation.predictor_step import TangentPredictorBordered
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+# UTF-8 console so the "ω" prints below do not crash under Windows' cp1252.
+sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+
 from time import time
 import numpy as np
 import pandas as pd
@@ -41,7 +44,7 @@ class SDOFVibroImpact(FBS_System):
         self.mass_matrix       = np.array([[m]])
         self.damping_matrix    = np.array([[c]])
         self.stiffness_matrix  = np.array([[k]])
-        self.B_coupling        = np.array([[1.0]])      # 1 interface DOF
+        self.B_coupling        = np.array([[-1.0]])      # 1 interface DOF
         self.total_dimension   = 1
         self.dimension         = 1                       # n_int
         self.polynomial_degree = poly_deg
@@ -64,17 +67,20 @@ class SDOFVibroImpact(FBS_System):
 
 
 # ============================ parameters ====================================
-EPSILON_SCHEDULE = [1.0e2]
+EPSILON_SCHEDULE = [1.0e0]
 EPSILON          = EPSILON_SCHEDULE[0]   # first entry; FD check uses this
-MAX_POINTS_BETWEEN_PHASES = 1000          # downsample FRC before each warm-start
+MAX_POINTS_BETWEEN_PHASES = 2000          # downsample FRC before each warm-start
 
 PARAMS = dict(m=1.0, c=0.05, k=1.0, F0=0.02)   # c=0.1 -> linear amp at res ~2*g0
 GAP       = 0.1
-HARMONICS = list(range(0, 25))
+HARMONICS = list(range(0, 30))
 
 OMEGA_START = 0.5
-OMEGA_END   = 1.5
+OMEGA_END   = 2.5
 
+GAMMA    = 0.0         # regularized contact-law smoothing parameter [N]
+LANCZOS_M       = 0.0    # "unitary" Lanczos filter
+LANCZOS_CUTOFF  = 1
 
 # ============================ build problem (NEW API) ======================
 
@@ -82,7 +88,7 @@ system   = SDOFVibroImpact(**PARAMS)
 HarmonicBalanceMethod.update_dependencies(HARMONICS, system.polynomial_degree)
 
 provider = NumericalFRF(system.mass_matrix, system.damping_matrix, system.stiffness_matrix)
-contact  = DLFTContact(epsilon=EPSILON, g_zero=GAP, gamma=1e-4, lanczos_m=2, lanczos_cutoff=1)
+contact  = DLFTContact(epsilon=EPSILON, g_zero=GAP, gamma=GAMMA, lanczos_m=LANCZOS_CUTOFF, lanczos_cutoff=LANCZOS_CUTOFF)
 problem  = FBSProblem(system, provider, contact)
 
 
@@ -250,7 +256,7 @@ fixed_newton_kwargs = {
 
 for eps in EPSILON_SCHEDULE[1:]:
     print(f"\nPhase 2: warm-start at ε = {eps:.1e}")
-    contact = DLFTContact(epsilon=eps, g_zero=GAP, gamma=1e-6, lanczos_m=1, lanczos_cutoff=1)
+    contact = DLFTContact(epsilon=eps, g_zero=GAP, gamma=GAMMA, lanczos_m=LANCZOS_M, lanczos_cutoff=LANCZOS_CUTOFF)
     problem = FBSProblem(system, provider, contact)
     solver  = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem)
 

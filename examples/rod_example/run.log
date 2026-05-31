@@ -1,0 +1,67 @@
+first axial mode: omega_1 = 2628.5 rad/s  (418.3 Hz)
+DOFs: total = 100, interface = 1, N_time = 1021, N_h = 31
+======================================================================
+Finite-difference checks of DLFT residual Jacobian and dr/domega
+======================================================================
+  Jacobian : max|J| = 4.592e+02, max abs err = 1.123e-02, rel = 2.45e-05
+  dr/domega: max|.| = 4.362e+01, max abs err = 7.618e-01, rel = 1.78e-02
+======================================================================
+linear free-end amplitude at omega_start: 5.828e-05 m  (gap d = 6.0e-05 m)
+
+Continuation (RL-HBM: regularized DLFT + Lanczos)
+progress 1.000 % 	iterations 1 	Δω 1.00e+00progress 8.995 % 	iterations 1 	Δω 1.00e+00progress 28.962 % 	iterations 2 	Δω 9.99e-01progress 48.716 % 	iterations 2 	Δω 9.96e-01progress 63.272 % 	iterations 4 	Δω 9.38e-01progress 65.830 % 	iterations 3 	Δω 2.14e-01progress 66.884 % 	iterations 3 	Δω 7.16e-02progress 67.493 % 	iterations 2 	Δω 3.69e-02progress 67.922 % 	iterations 2 	Δω 2.40e-02progress 68.272 % 	iterations 2 	Δω 1.84e-02progress 68.595 % 	iterations 2 	Δω 1.60e-02progress 68.922 % 	iterations 2 	Δω 1.55e-02progress 69.284 % 	iterations 2 	Δω 1.65e-02progress 69.721 % 	iterations 2 	Δω 1.90e-02progress 70.310 % 	iterations 2 	Δω 2.40e-02progress 71.240 % 	iterations 2 	Δω 3.44e-02progress 73.189 % 	iterations 3 	Δω 5.99e-02progress 80.862 % 	iterations 3 	Δω 1.51e-01progress 101.511 % 	iterations 3 	Δω 7.15e-01
+Terminate: outside frequency range after 20 solutions
+Total solving time: 45.85073494911194 seconds
+   [dbg i=0 omega=2102.8] iface_a1=2.900e-05  full_a1=2.900e-05  full_DC=1.594e-03  ts_peak=1.623e-03
+   [dbg] free-end harmonic amps (2/Nt|c_n|), n=0..6: 3.19e-03, 2.90e-05, 2.14e-09, 1.64e-12, 7.50e-15, 1.16e-19, 2.60e-19
+-> 20 points, omega in [2102.8, 3436.9] rad/s, 53.0 s
+   peak ||x_100||_inf: min=1.623e-03  max=2.569e-03  (scaled /1e-4: 16.23 .. 25.69)
+     omega=  2102.8  peak=1.6233e-03  (= 16.233 x1e-4)
+     omega=  2115.9  peak=1.6236e-03  (= 16.236 x1e-4)
+     omega=  2221.0  peak=1.6264e-03  (= 16.264 x1e-4)
+     omega=  2483.4  peak=1.6383e-03  (= 16.383 x1e-4)
+     omega=  2743.0  peak=1.6736e-03  (= 16.736 x1e-4)
+     omega=  2934.3  peak=1.8562e-03  (= 18.562 x1e-4)
+     omega=  2967.9  peak=2.0459e-03  (= 20.459 x1e-4)
+     omega=  2981.8  peak=2.2176e-03  (= 22.176 x1e-4)
+     omega=  2989.8  peak=2.3620e-03  (= 23.620 x1e-4)
+     omega=  2995.4  peak=2.4721e-03  (= 24.721 x1e-4)
+     omega=  3000.0  peak=2.5424e-03  (= 25.424 x1e-4)
+     omega=  3004.3  peak=2.5692e-03  (= 25.692 x1e-4)
+     omega=  3008.6  peak=2.5510e-03  (= 25.510 x1e-4)
+     omega=  3013.3  peak=2.4887e-03  (= 24.887 x1e-4)
+     omega=  3019.1  peak=2.3856e-03  (= 23.856 x1e-4)
+     omega=  3026.8  peak=2.2471e-03  (= 22.471 x1e-4)
+     omega=  3039.0  peak=2.0801e-03  (= 20.801 x1e-4)
+     omega=  3064.6  peak=1.8931e-03  (= 18.931 x1e-4)
+     omega=  3165.5  peak=1.7038e-03  (= 17.038 x1e-4)
+     omega=  3436.9  peak=1.6301e-03  (= 16.301 x1e-4)
+
+Continuation (R-HBM: regularized DLFT, no Lanczos)
+progress 1.000 % 	iterations 1 	Δω 1.00e+00progress 8.999 % 	iterations 1 	Δω 1.00e+00progress 28.997 % 	iterations 1 	Δω 1.00e+00progress 48.986 % 	iterations 1 	Δω 1.00e+00progress 68.943 % 	iterations 2 	Δω 9.99e-01progress 88.043 % 	iterations 3 	Δω 9.91e-01progress 94.150 % 	iterations 5 	Δω 6.04e-01progress 95.068 % 	iterations 2 	Δω 1.10e-01progress 96.301 % 	iterations 3 	Δω 7.50e-02progress 97.109 % 	iterations 2 	Δω 4.53e-02progress 97.671 % 	iterations 3 	Δω 3.11e-02progress 98.095 % 	iterations 3 	Δω 2.23e-02progress 98.535 % 	iterations 2 	Δω 1.85e-02progress 99.387 % 	iterations 2 	Δω 2.54e-02progress 102.488 % 	iterations 3 	Δω 6.31e-02
+Terminate: outside frequency range after 16 solutions
+Total solving time: 115.30521154403687 seconds
+   [dbg i=0 omega=2102.8] iface_a1=1.735e-05  full_a1=1.735e-05  full_DC=1.594e-03  ts_peak=1.612e-03
+   [dbg] free-end harmonic amps (2/Nt|c_n|), n=0..6: 3.19e-03, 1.74e-05, 3.51e-08, 1.32e-10, 6.08e-12, 5.76e-16, 2.17e-16
+-> 16 points, omega in [2102.8, 3449.7] rad/s, 323.9 s
+   peak ||x_100||_inf: min=1.612e-03  max=2.332e-03  (scaled /1e-4: 16.12 .. 23.32)
+     omega=  2102.8  peak=1.6116e-03  (= 16.116 x1e-4)
+     omega=  2115.9  peak=1.6117e-03  (= 16.117 x1e-4)
+     omega=  2221.1  peak=1.6127e-03  (= 16.127 x1e-4)
+     omega=  2483.9  peak=1.6161e-03  (= 16.161 x1e-4)
+     omega=  2746.6  peak=1.6225e-03  (= 16.225 x1e-4)
+     omega=  3008.8  peak=1.6380e-03  (= 16.380 x1e-4)
+     omega=  3259.9  peak=1.7192e-03  (= 17.192 x1e-4)
+     omega=  3340.1  peak=1.9385e-03  (= 19.385 x1e-4)
+     omega=  3352.2  peak=2.0320e-03  (= 20.320 x1e-4)
+     omega=  3368.4  peak=2.1974e-03  (= 21.974 x1e-4)
+     omega=  3379.0  peak=2.3022e-03  (= 23.022 x1e-4)
+     omega=  3386.4  peak=2.3315e-03  (= 23.315 x1e-4)
+     omega=  3392.0  peak=2.2817e-03  (= 22.817 x1e-4)
+     omega=  3397.8  peak=2.1588e-03  (= 21.588 x1e-4)
+     omega=  3409.0  peak=1.9790e-03  (= 19.790 x1e-4)
+     omega=  3449.7  peak=1.7688e-03  (= 17.688 x1e-4)
+
+Figure saved: C:\Users\yanni\Desktop\TUM\Bachelorarbeit\Fast_numerical_solution_for_nonlinear_FE_dynamics\code\pyhbm\examples\rod_example\rod_vibroimpact_frc.png
+C:\Users\yanni\Desktop\TUM\Bachelorarbeit\Fast_numerical_solution_for_nonlinear_FE_dynamics\code\pyhbm\examples\rod_example\main.py:290: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()

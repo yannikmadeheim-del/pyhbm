@@ -90,6 +90,7 @@ class FBSProblem:
         Nh = Fourier.number_of_harmonics
         self.complex_dimension = Nh * self.d_int
         self.real_dimension    = 2 * self.complex_dimension
+        self._eye_real         = eye(self.real_dimension)
 
         self.B_fourier = kron(eye(Nh), fbs.B_coupling)
         self.B_RI = block([[self.B_fourier, zeros_like(self.B_fourier)],
@@ -102,16 +103,27 @@ class FBSProblem:
 
         self.method.bind(self)
 
-    def _get_FRF(self, x: FourierOmegaPoint) -> np.ndarray:
+    def _get_factor(self, x: FourierOmegaPoint):
+        """Matrix-free block-diagonal FRF (LU factors), cached on the point."""
         if x.Y_cache is None:
-            x.Y_cache = self.frf_provider.compute_FRF(
+            x.Y_cache = self.frf_provider.factorize(
                 x.omega, Fourier.harmonics, self.d_total
             )
         return x.Y_cache
 
     def _get_BY(self, x: FourierOmegaPoint) -> np.ndarray:
         if x.BY_cache is None:
-            x.BY_cache = self.B_fourier @ self._get_FRF(x)
+            # BY is block-diagonal with blocks B_coupling @ Y_n = (Y_n^T B_coupling^T)^T.
+            factor = self._get_factor(x)
+            Bc  = self.ode.B_coupling                      # (n_int, d_total)
+            d, n_int = self.d_total, self.d_int
+            Nh = Fourier.number_of_harmonics
+            YT_BcT = factor.solve_transpose(np.tile(Bc.T, (Nh, 1)))  # (Nh*d, n_int)
+            BY = np.zeros((Nh * n_int, Nh * d), dtype=complex)
+            for k in range(Nh):
+                BY[k * n_int:(k + 1) * n_int, k * d:(k + 1) * d] = \
+                    YT_BcT[k * d:(k + 1) * d, :].T
+            x.BY_cache = BY
         return x.BY_cache
 
     def _get_BYBT_RI(self, x: FourierOmegaPoint) -> np.ndarray:
@@ -128,25 +140,24 @@ class FBSProblem:
 
     def compute_jacobian_of_residue_RI(self, x: FourierOmegaPoint) -> np.ndarray:
         J_nl_RI = self.method.compute_J_int_RI(x, self.ode)
-        return eye(self.real_dimension) + self._get_BYBT_RI(x) @ J_nl_RI
+        return self._eye_real + self._get_BYBT_RI(x) @ J_nl_RI
 
     def compute_derivative_wrt_omega_RI(self, x: FourierOmegaPoint) -> np.ndarray:
-        Y    = self._get_FRF(x)
-        dY   = self.frf_provider.compute_FRF_derivative(
-                   x.omega, Fourier.harmonics, self.d_total, Y)
-        dY_RI = _FRF_to_RI(dY)
-        BdY   = self.B_RI @ dY_RI
-        Fnl   = self.method.compute_F_int(x, self.ode)
-        Fnl_RI = vstack((Fnl.real, Fnl.imag))
+        factor = self._get_factor(x)
+        Fnl    = self.method.compute_F_int(x, self.ode)
+        # B dY (B^T F_nl - F_ext), matrix-free: w complex, then B @ (dY @ w).
+        w      = self.B_fourier.T @ Fnl - self.F_ext_full
+        BdY_w  = self.B_fourier @ factor.apply_derivative(w)
+        BdY_w_RI = vstack((BdY_w.real, BdY_w.imag))
         dF_nl_dw_RI = self.method.compute_dF_int_domega_RI(x, self.ode)
-        return BdY @ (self.B_RI.T @ Fnl_RI - self.F_ext_full_RI) + self._get_BYBT_RI(x) @ dF_nl_dw_RI
+        return BdY_w_RI + self._get_BYBT_RI(x) @ dF_nl_dw_RI
 
     def compute_full_response(self, fourier: Fourier, omega: float) -> Fourier:
         """Post-processing: full response for all d_total DOFs from a converged x_r."""
         x     = FourierOmegaPoint(fourier, omega)
         Fnl   = self.method.compute_F_int(x, self.ode)
-        Y     = self._get_FRF(x)
-        Q_full = Y @ (self.F_ext_full - self.B_fourier.T @ Fnl)
+        factor = self._get_factor(x)
+        Q_full = factor.solve(self.F_ext_full - self.B_fourier.T @ Fnl)
         coefficients = Q_full.reshape(Fourier.number_of_harmonics, self.d_total, 1)
         return Fourier(coefficients)
 

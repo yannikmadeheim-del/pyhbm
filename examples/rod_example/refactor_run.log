@@ -1,0 +1,481 @@
+first axial mode: omega_1 = 2628.5 rad/s  (418.3 Hz)
+DOFs: total = 100, interface = 1, N_time = 1021, N_h = 31
+======================================================================
+Finite-difference checks of DLFT residual Jacobian and dr/domega
+======================================================================
+  Jacobian : max|J| = 6.754e+01, max abs err = 7.349e-05, rel = 1.09e-06
+  dr/domega: max|.| = 1.005e-05, max abs err = 4.383e-10, rel = 4.36e-05
+======================================================================
+linear free-end amplitude at omega_start: 4.507e-05 m  (gap d = 6.0e-05 m)
+
+Continuation (RL-HBM: regularized DLFT + Lanczos)
+progress 0.020 % 	iterations 0 	Δω 1.00e+00progress 0.040 % 	iterations 0 	Δω 1.00e+00progress 0.091 % 	iterations 0 	Δω 1.00e+00progress 0.424 % 	iterations 0 	Δω 1.00e+00progress 0.758 % 	iterations 0 	Δω 1.00e+00progress 1.091 % 	iterations 0 	Δω 1.00e+00progress 1.424 % 	iterations 1 	Δω 1.00e+00progress 1.758 % 	iterations 0 	Δω 1.00e+00progress 2.091 % 	iterations 0 	Δω 1.00e+00progress 2.424 % 	iterations 1 	Δω 1.00e+00progress 2.758 % 	iterations 0 	Δω 1.00e+00progress 3.091 % 	iterations 1 	Δω 1.00e+00progress 3.424 % 	iterations 1 	Δω 1.00e+00progress 3.758 % 	iterations 1 	Δω 1.00e+00progress 4.091 % 	iterations 1 	Δω 1.00e+00progress 4.424 % 	iterations 1 	Δω 1.00e+00progress 4.758 % 	iterations 1 	Δω 1.00e+00progress 5.091 % 	iterations 1 	Δω 1.00e+00progress 5.424 % 	iterations 1 	Δω 1.00e+00progress 5.758 % 	iterations 1 	Δω 1.00e+00progress 6.091 % 	iterations 1 	Δω 1.00e+00progress 6.424 % 	iterations 1 	Δω 1.00e+00progress 6.758 % 	iterations 1 	Δω 1.00e+00progress 7.091 % 	iterations 0 	Δω 1.00e+00progress 7.424 % 	iterations 1 	Δω 1.00e+00progress 7.758 % 	iterations 0 	Δω 1.00e+00progress 8.091 % 	iterations 0 	Δω 1.00e+00progress 8.424 % 	iterations 1 	Δω 1.00e+00progress 8.758 % 	iterations 0 	Δω 1.00e+00progress 9.091 % 	iterations 0 	Δω 1.00e+00progress 9.424 % 	iterations 1 	Δω 1.00e+00progress 9.758 % 	iterations 0 	Δω 1.00e+00progress 10.091 % 	iterations 0 	Δω 1.00e+00progress 10.424 % 	iterations 0 	Δω 1.00e+00progress 10.758 % 	iterations 1 	Δω 1.00e+00progress 11.091 % 	iterations 0 	Δω 1.00e+00progress 11.424 % 	iterations 0 	Δω 1.00e+00progress 11.758 % 	iterations 0 	Δω 1.00e+00progress 12.091 % 	iterations 0 	Δω 1.00e+00progress 12.424 % 	iterations 1 	Δω 1.00e+00progress 12.758 % 	iterations 0 	Δω 1.00e+00progress 13.091 % 	iterations 0 	Δω 1.00e+00progress 13.424 % 	iterations 0 	Δω 1.00e+00progress 13.758 % 	iterations 1 	Δω 1.00e+00progress 14.091 % 	iterations 0 	Δω 1.00e+00progress 14.424 % 	iterations 1 	Δω 1.00e+00progress 14.758 % 	iterations 0 	Δω 1.00e+00progress 15.091 % 	iterations 1 	Δω 1.00e+00progress 15.424 % 	iterations 1 	Δω 1.00e+00progress 15.758 % 	iterations 1 	Δω 1.00e+00progress 16.091 % 	iterations 1 	Δω 1.00e+00progress 16.424 % 	iterations 1 	Δω 1.00e+00progress 16.758 % 	iterations 1 	Δω 1.00e+00progress 17.091 % 	iterations 1 	Δω 1.00e+00progress 17.424 % 	iterations 1 	Δω 1.00e+00progress 17.758 % 	iterations 1 	Δω 1.00e+00progress 18.091 % 	iterations 1 	Δω 1.00e+00progress 18.424 % 	iterations 1 	Δω 1.00e+00progress 18.758 % 	iterations 1 	Δω 1.00e+00progress 19.091 % 	iterations 1 	Δω 1.00e+00progress 19.424 % 	iterations 1 	Δω 1.00e+00progress 19.758 % 	iterations 1 	Δω 1.00e+00progress 20.091 % 	iterations 1 	Δω 1.00e+00progress 20.424 % 	iterations 2 	Δω 1.00e+00progress 20.758 % 	iterations 2 	Δω 1.00e+00progress 21.091 % 	iterations 1 	Δω 1.00e+00progress 21.424 % 	iterations 1 	Δω 1.00e+00progress 21.758 % 	iterations 1 	Δω 1.00e+00progress 22.091 % 	iterations 1 	Δω 1.00e+00progress 22.424 % 	iterations 1 	Δω 1.00e+00progress 22.758 % 	iterations 1 	Δω 1.00e+00progress 23.091 % 	iterations 1 	Δω 1.00e+00progress 23.424 % 	iterations 1 	Δω 1.00e+00progress 23.758 % 	iterations 1 	Δω 1.00e+00progress 24.091 % 	iterations 1 	Δω 1.00e+00progress 24.424 % 	iterations 1 	Δω 1.00e+00progress 24.758 % 	iterations 1 	Δω 1.00e+00progress 25.091 % 	iterations 1 	Δω 1.00e+00progress 25.424 % 	iterations 1 	Δω 1.00e+00progress 25.758 % 	iterations 1 	Δω 1.00e+00progress 26.091 % 	iterations 1 	Δω 1.00e+00progress 26.424 % 	iterations 1 	Δω 1.00e+00progress 26.758 % 	iterations 1 	Δω 1.00e+00progress 27.091 % 	iterations 1 	Δω 1.00e+00progress 27.424 % 	iterations 2 	Δω 1.00e+00progress 27.758 % 	iterations 2 	Δω 1.00e+00progress 28.091 % 	iterations 2 	Δω 1.00e+00progress 28.424 % 	iterations 2 	Δω 1.00e+00progress 28.758 % 	iterations 2 	Δω 1.00e+00progress 29.091 % 	iterations 2 	Δω 1.00e+00progress 29.424 % 	iterations 2 	Δω 1.00e+00progress 29.758 % 	iterations 2 	Δω 1.00e+00progress 30.091 % 	iterations 1 	Δω 1.00e+00progress 30.424 % 	iterations 1 	Δω 1.00e+00progress 30.758 % 	iterations 1 	Δω 1.00e+00progress 31.091 % 	iterations 1 	Δω 1.00e+00progress 31.424 % 	iterations 1 	Δω 1.00e+00progress 31.758 % 	iterations 1 	Δω 1.00e+00progress 32.091 % 	iterations 2 	Δω 1.00e+00progress 32.424 % 	iterations 2 	Δω 1.00e+00progress 32.758 % 	iterations 2 	Δω 1.00e+00progress 33.091 % 	iterations 2 	Δω 1.00e+00progress 33.424 % 	iterations 2 	Δω 1.00e+00progress 33.758 % 	iterations 1 	Δω 1.00e+00progress 34.091 % 	iterations 1 	Δω 1.00e+00progress 34.424 % 	iterations 1 	Δω 1.00e+00progress 34.758 % 	iterations 1 	Δω 1.00e+00progress 35.091 % 	iterations 1 	Δω 1.00e+00progress 35.424 % 	iterations 1 	Δω 1.00e+00progress 35.758 % 	iterations 1 	Δω 1.00e+00progress 36.091 % 	iterations 1 	Δω 1.00e+00progress 36.424 % 	iterations 1 	Δω 1.00e+00progress 36.758 % 	iterations 1 	Δω 1.00e+00progress 37.091 % 	iterations 1 	Δω 1.00e+00progress 37.424 % 	iterations 1 	Δω 1.00e+00progress 37.758 % 	iterations 1 	Δω 1.00e+00progress 38.091 % 	iterations 1 	Δω 1.00e+00progress 38.424 % 	iterations 1 	Δω 1.00e+00progress 38.758 % 	iterations 1 	Δω 1.00e+00progress 39.091 % 	iterations 1 	Δω 1.00e+00progress 39.424 % 	iterations 1 	Δω 1.00e+00progress 39.758 % 	iterations 1 	Δω 1.00e+00progress 40.091 % 	iterations 1 	Δω 1.00e+00progress 40.424 % 	iterations 1 	Δω 1.00e+00progress 40.758 % 	iterations 1 	Δω 1.00e+00progress 41.091 % 	iterations 1 	Δω 1.00e+00progress 41.424 % 	iterations 1 	Δω 1.00e+00progress 41.758 % 	iterations 1 	Δω 1.00e+00progress 42.091 % 	iterations 1 	Δω 1.00e+00progress 42.424 % 	iterations 1 	Δω 1.00e+00progress 42.758 % 	iterations 1 	Δω 1.00e+00progress 43.091 % 	iterations 1 	Δω 1.00e+00progress 43.424 % 	iterations 1 	Δω 1.00e+00progress 43.758 % 	iterations 1 	Δω 1.00e+00progress 44.091 % 	iterations 1 	Δω 1.00e+00progress 44.424 % 	iterations 1 	Δω 1.00e+00progress 44.758 % 	iterations 1 	Δω 1.00e+00progress 45.091 % 	iterations 1 	Δω 1.00e+00progress 45.424 % 	iterations 2 	Δω 1.00e+00progress 45.758 % 	iterations 2 	Δω 1.00e+00progress 46.091 % 	iterations 2 	Δω 1.00e+00progress 46.424 % 	iterations 2 	Δω 1.00e+00progress 46.758 % 	iterations 2 	Δω 1.00e+00progress 47.091 % 	iterations 2 	Δω 1.00e+00progress 47.424 % 	iterations 2 	Δω 1.00e+00progress 47.758 % 	iterations 2 	Δω 1.00e+00progress 48.091 % 	iterations 2 	Δω 1.00e+00progress 48.424 % 	iterations 2 	Δω 1.00e+00progress 48.758 % 	iterations 3 	Δω 1.00e+00progress 49.091 % 	iterations 3 	Δω 1.00e+00progress 49.424 % 	iterations 3 	Δω 1.00e+00progress 49.758 % 	iterations 3 	Δω 1.00e+00progress 50.091 % 	iterations 4 	Δω 1.00e+00progress 50.424 % 	iterations 4 	Δω 1.00e+00progress 50.758 % 	iterations 4 	Δω 1.00e+00progress 51.091 % 	iterations 4 	Δω 1.00e+00progress 51.424 % 	iterations 4 	Δω 1.00e+00progress 51.758 % 	iterations 4 	Δω 1.00e+00progress 52.091 % 	iterations 4 	Δω 1.00e+00progress 52.424 % 	iterations 6 	Δω 1.00e+00progress 52.508 % 	iterations 2 	Δω 1.00e+00progress 52.841 % 	iterations 4 	Δω 1.00e+00progress 53.174 % 	iterations 5 	Δω 1.00e+00progress 53.341 % 	iterations 4 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 53.341 % 	iterations 0 	Δω 1.00e+00progress 53.341 % 	iterations 0 	Δω 1.00e+00progress 53.341 % 	iterations 0 	Δω 1.00e+00progress 53.341 % 	iterations 0 	Δω 1.00e+00progress 53.346 % 	iterations 1 	Δω 1.00e+00progress 53.381 % 	iterations 2 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 53.381 % 	iterations 0 	Δω 1.00e+00progress 53.381 % 	iterations 0 	Δω 1.00e+00progress 53.381 % 	iterations 0 	Δω 1.00e+00progress 53.381 % 	iterations 0 	Δω 1.00e+00progress 53.385 % 	iterations 1 	Δω 1.00e+00progress 53.420 % 	iterations 61 	Δω 1.00e+00progress 53.420 % 	iterations 0 	Δω 1.00e+00progress 53.420 % 	iterations 0 	Δω 1.00e+00progress 53.420 % 	iterations 0 	Δω 1.00e+00progress 53.421 % 	iterations 0 	Δω 1.00e+00progress 53.425 % 	iterations 1 	Δω 1.00e+00progress 53.460 % 	iterations 5 	Δω 1.00e+00progress 53.477 % 	iterations 2 	Δω 1.00e+00progress 53.547 % 	iterations 4 	Δω 1.00e+00progress 53.617 % 	iterations 2 	Δω 1.00e+00progress 53.897 % 	iterations 3 	Δω 1.00e+00progress 54.230 % 	iterations 3 	Δω 1.00e+00progress 54.563 % 	iterations 3 	Δω 1.00e+00progress 54.897 % 	iterations 3 	Δω 1.00e+00progress 55.230 % 	iterations 3 	Δω 1.00e+00progress 55.563 % 	iterations 4 	Δω 1.00e+00progress 55.897 % 	iterations 5 	Δω 1.00e+00progress 56.063 % 	iterations 5 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.063 % 	iterations 0 	Δω 1.00e+00progress 56.063 % 	iterations 0 	Δω 1.00e+00progress 56.063 % 	iterations 0 	Δω 1.00e+00progress 56.064 % 	iterations 0 	Δω 1.00e+00progress 56.068 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.068 % 	iterations 0 	Δω 1.00e+00progress 56.068 % 	iterations 0 	Δω 1.00e+00progress 56.068 % 	iterations 0 	Δω 1.00e+00progress 56.068 % 	iterations 0 	Δω 1.00e+00progress 56.073 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.073 % 	iterations 0 	Δω 1.00e+00progress 56.073 % 	iterations 0 	Δω 1.00e+00progress 56.073 % 	iterations 0 	Δω 1.00e+00progress 56.073 % 	iterations 0 	Δω 1.00e+00progress 56.077 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.077 % 	iterations 0 	Δω 1.00e+00progress 56.077 % 	iterations 0 	Δω 1.00e+00progress 56.077 % 	iterations 0 	Δω 1.00e+00progress 56.078 % 	iterations 0 	Δω 1.00e+00progress 56.082 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.082 % 	iterations 0 	Δω 1.00e+00progress 56.082 % 	iterations 0 	Δω 1.00e+00progress 56.082 % 	iterations 0 	Δω 1.00e+00progress 56.082 % 	iterations 0 	Δω 1.00e+00progress 56.087 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.087 % 	iterations 0 	Δω 1.00e+00progress 56.087 % 	iterations 0 	Δω 1.00e+00progress 56.087 % 	iterations 0 	Δω 1.00e+00progress 56.087 % 	iterations 0 	Δω 1.00e+00progress 56.091 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.091 % 	iterations 0 	Δω 1.00e+00progress 56.091 % 	iterations 0 	Δω 1.00e+00progress 56.091 % 	iterations 0 	Δω 1.00e+00progress 56.092 % 	iterations 1 	Δω 1.00e+00progress 56.094 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.094 % 	iterations 0 	Δω 1.00e+00progress 56.094 % 	iterations 0 	Δω 1.00e+00progress 56.094 % 	iterations 0 	Δω 1.00e+00progress 56.094 % 	iterations 0 	Δω 1.00e+00progress 56.099 % 	iterations 2 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.099 % 	iterations 0 	Δω 1.00e+00progress 56.099 % 	iterations 0 	Δω 1.00e+00progress 56.099 % 	iterations 0 	Δω 1.00e+00progress 56.099 % 	iterations 1 	Δω 1.00e+00progress 56.101 % 	iterations 2 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.101 % 	iterations 0 	Δω 1.00e+00progress 56.101 % 	iterations 0 	Δω 1.00e+00progress 56.101 % 	iterations 0 	Δω 1.00e+00progress 56.101 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.101 % 	iterations 0 	Δω 1.00e+00progress 56.101 % 	iterations 0 	Δω 1.00e+00progress 56.101 % 	iterations 0 	Δω 1.00e+00progress 56.102 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.102 % 	iterations 0 	Δω 1.00e+00progress 56.102 % 	iterations 0 	Δω 1.00e+00progress 56.102 % 	iterations 0 	Δω 1.00e+00progress 56.102 % 	iterations 1 	Δω 1.00e+00Newton-Raphson: maximum iterations reached (200)
+progress 56.102 % 	iterations 0 	Δω 9.99e-01progress 56.102 % 	iterations 0 	Δω 9.99e-01progress 56.102 % 	iterations 0 	Δω 9.99e-01progress 56.102 % 	iterations 106 	Δω 9.99e-01progress 56.102 % 	iterations 0 	Δω -1.00e+00progress 56.102 % 	iterations 0 	Δω -1.00e+00progress 56.102 % 	iterations 0 	Δω -1.00e+00progress 56.101 % 	iterations 1 	Δω -1.00e+00progress 56.099 % 	iterations 3 	Δω -1.00e+00progress 56.095 % 	iterations 3 	Δω -1.00e+00progress 56.086 % 	iterations 3 	Δω -1.00e+00progress 56.069 % 	iterations 3 	Δω -1.00e+00progress 56.034 % 	iterations 3 	Δω -1.00e+00progress 55.964 % 	iterations 4 	Δω -1.00e+00progress 55.894 % 	iterations 3 	Δω -1.00e+00progress 55.754 % 	iterations 3 	Δω -1.00e+00progress 55.474 % 	iterations 4 	Δω -1.00e+00progress 55.195 % 	iterations 3 	Δω -1.00e+00progress 54.861 % 	iterations 3 	Δω -1.00e+00progress 54.528 % 	iterations 3 	Δω -1.00e+00progress 54.195 % 	iterations 2 	Δω -1.00e+00progress 53.861 % 	iterations 3 	Δω -1.00e+00progress 53.528 % 	iterations 4 	Δω -1.00e+00progress 53.195 % 	iterations 38 	Δω -1.00e+00progress 53.195 % 	iterations 0 	Δω -1.00e+00progress 53.195 % 	iterations 0 	Δω -1.00e+00progress 53.195 % 	iterations 0 	Δω -1.00e+00progress 53.194 % 	iterations 0 	Δω -1.00e+00progress 53.190 % 	iterations 1 	Δω -1.00e+00progress 53.155 % 	iterations 2 	Δω -1.00e+00progress 53.015 % 	iterations 3 	Δω -1.00e+00progress 52.736 % 	iterations 4 	Δω -1.00e+00progress 52.456 % 	iterations 5 	Δω -1.00e+00progress 52.316 % 	iterations 3 	Δω -1.00e+00progress 52.037 % 	iterations 4 	Δω -1.00e+00progress 51.757 % 	iterations 4 	Δω -1.00e+00progress 51.477 % 	iterations 5 	Δω -1.00e+00progress 51.338 % 	iterations 3 	Δω -1.00e+00progress 51.058 % 	iterations 4 	Δω -1.00e+00progress 50.778 % 	iterations 4 	Δω -1.00e+00progress 50.499 % 	iterations 3 	Δω -1.00e+00progress 50.165 % 	iterations 4 	Δω -1.00e+00progress 49.832 % 	iterations 3 	Δω -1.00e+00progress 49.499 % 	iterations 4 	Δω -1.00e+00progress 49.165 % 	iterations 4 	Δω -1.00e+00progress 48.832 % 	iterations 4 	Δω -1.00e+00progress 48.499 % 	iterations 4 	Δω -1.00e+00progress 48.165 % 	iterations 3 	Δω -1.00e+00progress 47.832 % 	iterations 2 	Δω -1.00e+00progress 47.499 % 	iterations 2 	Δω -1.00e+00progress 47.165 % 	iterations 2 	Δω -1.00e+00progress 46.832 % 	iterations 2 	Δω -1.00e+00progress 46.499 % 	iterations 2 	Δω -1.00e+00progress 46.165 % 	iterations 2 	Δω -1.00e+00progress 45.832 % 	iterations 2 	Δω -1.00e+00progress 45.499 % 	iterations 2 	Δω -1.00e+00progress 45.165 % 	iterations 2 	Δω -1.00e+00progress 44.832 % 	iterations 2 	Δω -1.00e+00progress 44.499 % 	iterations 1 	Δω -1.00e+00progress 44.165 % 	iterations 1 	Δω -1.00e+00progress 43.832 % 	iterations 1 	Δω -1.00e+00progress 43.499 % 	iterations 1 	Δω -1.00e+00progress 43.165 % 	iterations 1 	Δω -1.00e+00progress 42.832 % 	iterations 1 	Δω -1.00e+00progress 42.499 % 	iterations 1 	Δω -1.00e+00progress 42.165 % 	iterations 1 	Δω -1.00e+00progress 41.832 % 	iterations 1 	Δω -1.00e+00progress 41.499 % 	iterations 1 	Δω -1.00e+00progress 41.165 % 	iterations 1 	Δω -1.00e+00progress 40.832 % 	iterations 1 	Δω -1.00e+00progress 40.499 % 	iterations 1 	Δω -1.00e+00progress 40.165 % 	iterations 1 	Δω -1.00e+00progress 39.832 % 	iterations 1 	Δω -1.00e+00progress 39.499 % 	iterations 1 	Δω -1.00e+00progress 39.165 % 	iterations 1 	Δω -1.00e+00progress 38.832 % 	iterations 1 	Δω -1.00e+00progress 38.499 % 	iterations 1 	Δω -1.00e+00progress 38.165 % 	iterations 1 	Δω -1.00e+00progress 37.832 % 	iterations 1 	Δω -1.00e+00progress 37.499 % 	iterations 1 	Δω -1.00e+00progress 37.165 % 	iterations 1 	Δω -1.00e+00progress 36.832 % 	iterations 1 	Δω -1.00e+00progress 36.499 % 	iterations 1 	Δω -1.00e+00progress 36.165 % 	iterations 1 	Δω -1.00e+00progress 35.832 % 	iterations 1 	Δω -1.00e+00progress 35.499 % 	iterations 1 	Δω -1.00e+00progress 35.165 % 	iterations 1 	Δω -1.00e+00progress 34.832 % 	iterations 1 	Δω -1.00e+00progress 34.499 % 	iterations 1 	Δω -1.00e+00progress 34.165 % 	iterations 1 	Δω -1.00e+00progress 33.832 % 	iterations 1 	Δω -1.00e+00progress 33.499 % 	iterations 1 	Δω -1.00e+00progress 33.165 % 	iterations 2 	Δω -1.00e+00progress 32.832 % 	iterations 2 	Δω -1.00e+00progress 32.499 % 	iterations 2 	Δω -1.00e+00progress 32.165 % 	iterations 2 	Δω -1.00e+00progress 31.832 % 	iterations 2 	Δω -1.00e+00progress 31.499 % 	iterations 1 	Δω -1.00e+00progress 31.165 % 	iterations 1 	Δω -1.00e+00progress 30.832 % 	iterations 1 	Δω -1.00e+00progress 30.499 % 	iterations 1 	Δω -1.00e+00progress 30.165 % 	iterations 1 	Δω -1.00e+00progress 29.832 % 	iterations 1 	Δω -1.00e+00progress 29.499 % 	iterations 2 	Δω -1.00e+00progress 29.165 % 	iterations 2 	Δω -1.00e+00progress 28.832 % 	iterations 2 	Δω -1.00e+00progress 28.499 % 	iterations 2 	Δω -1.00e+00progress 28.165 % 	iterations 2 	Δω -1.00e+00progress 27.832 % 	iterations 2 	Δω -1.00e+00progress 27.499 % 	iterations 2 	Δω -1.00e+00progress 27.165 % 	iterations 2 	Δω -1.00e+00progress 26.832 % 	iterations 1 	Δω -1.00e+00progress 26.499 % 	iterations 1 	Δω -1.00e+00progress 26.165 % 	iterations 1 	Δω -1.00e+00progress 25.832 % 	iterations 1 	Δω -1.00e+00progress 25.499 % 	iterations 1 	Δω -1.00e+00progress 25.165 % 	iterations 1 	Δω -1.00e+00progress 24.832 % 	iterations 1 	Δω -1.00e+00progress 24.499 % 	iterations 1 	Δω -1.00e+00progress 24.165 % 	iterations 1 	Δω -1.00e+00progress 23.832 % 	iterations 1 	Δω -1.00e+00progress 23.499 % 	iterations 1 	Δω -1.00e+00progress 23.165 % 	iterations 1 	Δω -1.00e+00progress 22.832 % 	iterations 1 	Δω -1.00e+00progress 22.499 % 	iterations 1 	Δω -1.00e+00progress 22.165 % 	iterations 1 	Δω -1.00e+00progress 21.832 % 	iterations 1 	Δω -1.00e+00progress 21.499 % 	iterations 1 	Δω -1.00e+00progress 21.165 % 	iterations 1 	Δω -1.00e+00progress 20.832 % 	iterations 1 	Δω -1.00e+00progress 20.499 % 	iterations 2 	Δω -1.00e+00progress 20.165 % 	iterations 2 	Δω -1.00e+00progress 19.832 % 	iterations 2 	Δω -1.00e+00progress 19.499 % 	iterations 1 	Δω -1.00e+00progress 19.165 % 	iterations 1 	Δω -1.00e+00progress 18.832 % 	iterations 1 	Δω -1.00e+00progress 18.499 % 	iterations 1 	Δω -1.00e+00progress 18.165 % 	iterations 1 	Δω -1.00e+00progress 17.832 % 	iterations 1 	Δω -1.00e+00progress 17.499 % 	iterations 1 	Δω -1.00e+00progress 17.165 % 	iterations 1 	Δω -1.00e+00progress 16.832 % 	iterations 1 	Δω -1.00e+00progress 16.499 % 	iterations 1 	Δω -1.00e+00progress 16.165 % 	iterations 1 	Δω -1.00e+00progress 15.832 % 	iterations 1 	Δω -1.00e+00progress 15.499 % 	iterations 1 	Δω -1.00e+00progress 15.165 % 	iterations 1 	Δω -1.00e+00progress 14.832 % 	iterations 1 	Δω -1.00e+00progress 14.499 % 	iterations 0 	Δω -1.00e+00progress 14.165 % 	iterations 1 	Δω -1.00e+00progress 13.832 % 	iterations 0 	Δω -1.00e+00progress 13.499 % 	iterations 1 	Δω -1.00e+00progress 13.165 % 	iterations 0 	Δω -1.00e+00progress 12.832 % 	iterations 0 	Δω -1.00e+00progress 12.499 % 	iterations 1 	Δω -1.00e+00progress 12.165 % 	iterations 0 	Δω -1.00e+00progress 11.832 % 	iterations 0 	Δω -1.00e+00progress 11.499 % 	iterations 0 	Δω -1.00e+00progress 11.165 % 	iterations 0 	Δω -1.00e+00progress 10.832 % 	iterations 1 	Δω -1.00e+00progress 10.499 % 	iterations 0 	Δω -1.00e+00progress 10.165 % 	iterations 0 	Δω -1.00e+00progress 9.832 % 	iterations 0 	Δω -1.00e+00progress 9.499 % 	iterations 1 	Δω -1.00e+00progress 9.165 % 	iterations 0 	Δω -1.00e+00progress 8.832 % 	iterations 0 	Δω -1.00e+00progress 8.499 % 	iterations 1 	Δω -1.00e+00progress 8.360 % 	iterations 0 	Δω -1.00e+00progress 8.380 % 	iterations 0 	Δω -1.00e+00progress 8.400 % 	iterations 1 	Δω -1.00e+00progress 8.420 % 	iterations 0 	Δω -1.00e+00progress 8.440 % 	iterations 1 	Δω -1.00e+00progress 8.460 % 	iterations 1 	Δω -1.00e+00progress 8.480 % 	iterations 1 	Δω -1.00e+00progress 8.500 % 	iterations 1 	Δω -1.00e+00progress 8.520 % 	iterations 1 	Δω -1.00e+00progress 8.540 % 	iterations 1 	Δω -1.00e+00progress 8.560 % 	iterations 1 	Δω -1.00e+00progress 8.580 % 	iterations 1 	Δω -1.00e+00progress 8.600 % 	iterations 1 	Δω -1.00e+00progress 8.620 % 	iterations 1 	Δω -1.00e+00progress 8.640 % 	iterations 1 	Δω -1.00e+00progress 8.660 % 	iterations 1 	Δω -1.00e+00progress 8.680 % 	iterations 1 	Δω -1.00e+00progress 8.700 % 	iterations 0 	Δω -1.00e+00progress 8.720 % 	iterations 1 	Δω -1.00e+00progress 8.740 % 	iterations 0 	Δω -1.00e+00progress 8.760 % 	iterations 0 	Δω -1.00e+00progress 8.780 % 	iterations 1 	Δω -1.00e+00progress 8.800 % 	iterations 0 	Δω -1.00e+00progress 8.820 % 	iterations 0 	Δω -1.00e+00progress 8.840 % 	iterations 0 	Δω -1.00e+00progress 8.860 % 	iterations 1 	Δω -1.00e+00
+Terminate: outside frequency range after 444 solutions
+Total solving time: 269.4192235469818 seconds
+   [dbg i=0 omega=4994096.8] iface_a1=4.404e-05  full_a1=4.404e-05  full_DC=6.338e-07  ts_peak=4.460e-05
+   [dbg] free-end harmonic amps (2/Nt|c_n|), n=0..6: 1.27e-06, 4.40e-05, 1.23e-07, 8.02e-09, 5.29e-08, 2.18e-09, 6.41e-10
+-> 444 points, omega in [4987475.4, 7206030.0] rad/s, 275.6 s
+   peak ||x_100||_inf: min=4.449e-05  max=1.114e-04  (scaled /1e-4: 0.44 .. 1.11)
+     omega=4994096.8  peak=4.4601e-05  (=  0.446 x1e-4)
+     omega=4994110.0  peak=4.4601e-05  (=  0.446 x1e-4)
+     omega=4994320.2  peak=4.4605e-05  (=  0.446 x1e-4)
+     omega=4997684.7  peak=4.4662e-05  (=  0.447 x1e-4)
+     omega=5010827.1  peak=4.4887e-05  (=  0.449 x1e-4)
+     omega=5023969.4  peak=4.5116e-05  (=  0.451 x1e-4)
+     omega=5037111.8  peak=4.5349e-05  (=  0.453 x1e-4)
+     omega=5050254.1  peak=4.5586e-05  (=  0.456 x1e-4)
+     omega=5063396.5  peak=4.5827e-05  (=  0.458 x1e-4)
+     omega=5076538.9  peak=4.6073e-05  (=  0.461 x1e-4)
+     omega=5089681.2  peak=4.6325e-05  (=  0.463 x1e-4)
+     omega=5102823.6  peak=4.6583e-05  (=  0.466 x1e-4)
+     omega=5115965.9  peak=4.6846e-05  (=  0.468 x1e-4)
+     omega=5129108.3  peak=4.7116e-05  (=  0.471 x1e-4)
+     omega=5142250.7  peak=4.7388e-05  (=  0.474 x1e-4)
+     omega=5155393.0  peak=4.7653e-05  (=  0.477 x1e-4)
+     omega=5168535.4  peak=4.7889e-05  (=  0.479 x1e-4)
+     omega=5181677.7  peak=4.8062e-05  (=  0.481 x1e-4)
+     omega=5194820.1  peak=4.8178e-05  (=  0.482 x1e-4)
+     omega=5207962.5  peak=4.8312e-05  (=  0.483 x1e-4)
+     omega=5221104.8  peak=4.8510e-05  (=  0.485 x1e-4)
+     omega=5234247.2  peak=4.8761e-05  (=  0.488 x1e-4)
+     omega=5247389.5  peak=4.9037e-05  (=  0.490 x1e-4)
+     omega=5260531.9  peak=4.9325e-05  (=  0.493 x1e-4)
+     omega=5273674.3  peak=4.9618e-05  (=  0.496 x1e-4)
+     omega=5286816.6  peak=4.9914e-05  (=  0.499 x1e-4)
+     omega=5299959.0  peak=5.0212e-05  (=  0.502 x1e-4)
+     omega=5313101.3  peak=5.0511e-05  (=  0.505 x1e-4)
+     omega=5326243.7  peak=5.0811e-05  (=  0.508 x1e-4)
+     omega=5339386.1  peak=5.1114e-05  (=  0.511 x1e-4)
+     omega=5352528.4  peak=5.1420e-05  (=  0.514 x1e-4)
+     omega=5365670.8  peak=5.1727e-05  (=  0.517 x1e-4)
+     omega=5378813.1  peak=5.2039e-05  (=  0.520 x1e-4)
+     omega=5391955.5  peak=5.2354e-05  (=  0.524 x1e-4)
+     omega=5405097.9  peak=5.2669e-05  (=  0.527 x1e-4)
+     omega=5418240.2  peak=5.2984e-05  (=  0.530 x1e-4)
+     omega=5431382.6  peak=5.3302e-05  (=  0.533 x1e-4)
+     omega=5444524.9  peak=5.3620e-05  (=  0.536 x1e-4)
+     omega=5457667.3  peak=5.3939e-05  (=  0.539 x1e-4)
+     omega=5470809.7  peak=5.4260e-05  (=  0.543 x1e-4)
+     omega=5483952.0  peak=5.4581e-05  (=  0.546 x1e-4)
+     omega=5497094.4  peak=5.4902e-05  (=  0.549 x1e-4)
+     omega=5510236.7  peak=5.5224e-05  (=  0.552 x1e-4)
+     omega=5523379.1  peak=5.5546e-05  (=  0.555 x1e-4)
+     omega=5536521.5  peak=5.5869e-05  (=  0.559 x1e-4)
+     omega=5549663.8  peak=5.6189e-05  (=  0.562 x1e-4)
+     omega=5562806.2  peak=5.6511e-05  (=  0.565 x1e-4)
+     omega=5575948.5  peak=5.6828e-05  (=  0.568 x1e-4)
+     omega=5589090.9  peak=5.7148e-05  (=  0.571 x1e-4)
+     omega=5602233.3  peak=5.7465e-05  (=  0.575 x1e-4)
+     omega=5615375.6  peak=5.7782e-05  (=  0.578 x1e-4)
+     omega=5628518.0  peak=5.8099e-05  (=  0.581 x1e-4)
+     omega=5641660.3  peak=5.8421e-05  (=  0.584 x1e-4)
+     omega=5654802.7  peak=5.8749e-05  (=  0.587 x1e-4)
+     omega=5667945.1  peak=5.9089e-05  (=  0.591 x1e-4)
+     omega=5681087.4  peak=5.9437e-05  (=  0.594 x1e-4)
+     omega=5694229.8  peak=5.9797e-05  (=  0.598 x1e-4)
+     omega=5707372.1  peak=6.0170e-05  (=  0.602 x1e-4)
+     omega=5720514.5  peak=6.0561e-05  (=  0.606 x1e-4)
+     omega=5733656.9  peak=6.0967e-05  (=  0.610 x1e-4)
+     omega=5746799.2  peak=6.1376e-05  (=  0.614 x1e-4)
+     omega=5759941.6  peak=6.1753e-05  (=  0.618 x1e-4)
+     omega=5773083.9  peak=6.2026e-05  (=  0.620 x1e-4)
+     omega=5786226.3  peak=6.2105e-05  (=  0.621 x1e-4)
+     omega=5799368.7  peak=6.1959e-05  (=  0.620 x1e-4)
+     omega=5812511.0  peak=6.1675e-05  (=  0.617 x1e-4)
+     omega=5825653.4  peak=6.1405e-05  (=  0.614 x1e-4)
+     omega=5838795.7  peak=6.1237e-05  (=  0.612 x1e-4)
+     omega=5851938.1  peak=6.1157e-05  (=  0.612 x1e-4)
+     omega=5865080.5  peak=6.1103e-05  (=  0.611 x1e-4)
+     omega=5878222.8  peak=6.1038e-05  (=  0.610 x1e-4)
+     omega=5891365.2  peak=6.0986e-05  (=  0.610 x1e-4)
+     omega=5904507.5  peak=6.1056e-05  (=  0.611 x1e-4)
+     omega=5917649.9  peak=6.1366e-05  (=  0.614 x1e-4)
+     omega=5930792.3  peak=6.1706e-05  (=  0.617 x1e-4)
+     omega=5943934.6  peak=6.2057e-05  (=  0.621 x1e-4)
+     omega=5957077.0  peak=6.2421e-05  (=  0.624 x1e-4)
+     omega=5970219.3  peak=6.2797e-05  (=  0.628 x1e-4)
+     omega=5983361.7  peak=6.3188e-05  (=  0.632 x1e-4)
+     omega=5996504.1  peak=6.3595e-05  (=  0.636 x1e-4)
+     omega=6009646.4  peak=6.4015e-05  (=  0.640 x1e-4)
+     omega=6022788.8  peak=6.4448e-05  (=  0.644 x1e-4)
+     omega=6035931.1  peak=6.4899e-05  (=  0.649 x1e-4)
+     omega=6049073.5  peak=6.5380e-05  (=  0.654 x1e-4)
+     omega=6062215.9  peak=6.5893e-05  (=  0.659 x1e-4)
+     omega=6075358.2  peak=6.6423e-05  (=  0.664 x1e-4)
+     omega=6088500.6  peak=6.6895e-05  (=  0.669 x1e-4)
+     omega=6101642.9  peak=6.7183e-05  (=  0.672 x1e-4)
+     omega=6114785.3  peak=6.7227e-05  (=  0.672 x1e-4)
+     omega=6127927.7  peak=6.7113e-05  (=  0.671 x1e-4)
+     omega=6141070.0  peak=6.6937e-05  (=  0.669 x1e-4)
+     omega=6154212.4  peak=6.6759e-05  (=  0.668 x1e-4)
+     omega=6167354.7  peak=6.6633e-05  (=  0.666 x1e-4)
+     omega=6180497.1  peak=6.6585e-05  (=  0.666 x1e-4)
+     omega=6193639.5  peak=6.6644e-05  (=  0.666 x1e-4)
+     omega=6206781.8  peak=6.6819e-05  (=  0.668 x1e-4)
+     omega=6219924.2  peak=6.7149e-05  (=  0.671 x1e-4)
+     omega=6233066.5  peak=6.7581e-05  (=  0.676 x1e-4)
+     omega=6246208.9  peak=6.8064e-05  (=  0.681 x1e-4)
+     omega=6259351.3  peak=6.8572e-05  (=  0.686 x1e-4)
+     omega=6272493.6  peak=6.9046e-05  (=  0.690 x1e-4)
+     omega=6285636.0  peak=6.9409e-05  (=  0.694 x1e-4)
+     omega=6298778.3  peak=6.9627e-05  (=  0.696 x1e-4)
+     omega=6311920.7  peak=6.9751e-05  (=  0.698 x1e-4)
+     omega=6325063.1  peak=6.9847e-05  (=  0.698 x1e-4)
+     omega=6338205.4  peak=6.9974e-05  (=  0.700 x1e-4)
+     omega=6351347.8  peak=7.0139e-05  (=  0.701 x1e-4)
+     omega=6364490.1  peak=7.0358e-05  (=  0.704 x1e-4)
+     omega=6377632.5  peak=7.0634e-05  (=  0.706 x1e-4)
+     omega=6390774.9  peak=7.0951e-05  (=  0.710 x1e-4)
+     omega=6403917.2  peak=7.1276e-05  (=  0.713 x1e-4)
+     omega=6417059.6  peak=7.1583e-05  (=  0.716 x1e-4)
+     omega=6430201.9  peak=7.1873e-05  (=  0.719 x1e-4)
+     omega=6443344.3  peak=7.2159e-05  (=  0.722 x1e-4)
+     omega=6456486.7  peak=7.2450e-05  (=  0.724 x1e-4)
+     omega=6469629.0  peak=7.2748e-05  (=  0.727 x1e-4)
+     omega=6482771.4  peak=7.3048e-05  (=  0.730 x1e-4)
+     omega=6495913.7  peak=7.3351e-05  (=  0.734 x1e-4)
+     omega=6509056.1  peak=7.3661e-05  (=  0.737 x1e-4)
+     omega=6522198.5  peak=7.3984e-05  (=  0.740 x1e-4)
+     omega=6535340.8  peak=7.4318e-05  (=  0.743 x1e-4)
+     omega=6548483.2  peak=7.4655e-05  (=  0.747 x1e-4)
+     omega=6561625.5  peak=7.4993e-05  (=  0.750 x1e-4)
+     omega=6574767.9  peak=7.5334e-05  (=  0.753 x1e-4)
+     omega=6587910.3  peak=7.5683e-05  (=  0.757 x1e-4)
+     omega=6601052.6  peak=7.6040e-05  (=  0.760 x1e-4)
+     omega=6614195.0  peak=7.6406e-05  (=  0.764 x1e-4)
+     omega=6627337.3  peak=7.6780e-05  (=  0.768 x1e-4)
+     omega=6640479.7  peak=7.7162e-05  (=  0.772 x1e-4)
+     omega=6653622.1  peak=7.7553e-05  (=  0.776 x1e-4)
+     omega=6666764.4  peak=7.7952e-05  (=  0.780 x1e-4)
+     omega=6679906.8  peak=7.8362e-05  (=  0.784 x1e-4)
+     omega=6693049.1  peak=7.8782e-05  (=  0.788 x1e-4)
+     omega=6706191.5  peak=7.9211e-05  (=  0.792 x1e-4)
+     omega=6719333.9  peak=7.9652e-05  (=  0.797 x1e-4)
+     omega=6732476.2  peak=8.0103e-05  (=  0.801 x1e-4)
+     omega=6745618.6  peak=8.0566e-05  (=  0.806 x1e-4)
+     omega=6758760.9  peak=8.1040e-05  (=  0.810 x1e-4)
+     omega=6771903.3  peak=8.1525e-05  (=  0.815 x1e-4)
+     omega=6785045.7  peak=8.2031e-05  (=  0.820 x1e-4)
+     omega=6798188.0  peak=8.2546e-05  (=  0.825 x1e-4)
+     omega=6811330.4  peak=8.3077e-05  (=  0.831 x1e-4)
+     omega=6824472.7  peak=8.3632e-05  (=  0.836 x1e-4)
+     omega=6837615.1  peak=8.4214e-05  (=  0.842 x1e-4)
+     omega=6850757.5  peak=8.4817e-05  (=  0.848 x1e-4)
+     omega=6863899.8  peak=8.5436e-05  (=  0.854 x1e-4)
+     omega=6877042.2  peak=8.6066e-05  (=  0.861 x1e-4)
+     omega=6890184.5  peak=8.6743e-05  (=  0.867 x1e-4)
+     omega=6903326.9  peak=8.7479e-05  (=  0.875 x1e-4)
+     omega=6916469.3  peak=8.8222e-05  (=  0.882 x1e-4)
+     omega=6929611.6  peak=8.8971e-05  (=  0.890 x1e-4)
+     omega=6942754.0  peak=8.9730e-05  (=  0.897 x1e-4)
+     omega=6955896.3  peak=9.0516e-05  (=  0.905 x1e-4)
+     omega=6969038.7  peak=9.1324e-05  (=  0.913 x1e-4)
+     omega=6982181.0  peak=9.2171e-05  (=  0.922 x1e-4)
+     omega=6995323.4  peak=9.3023e-05  (=  0.930 x1e-4)
+     omega=7008465.8  peak=9.3884e-05  (=  0.939 x1e-4)
+     omega=7021608.1  peak=9.4767e-05  (=  0.948 x1e-4)
+     omega=7034750.5  peak=9.5665e-05  (=  0.957 x1e-4)
+     omega=7047892.8  peak=9.6673e-05  (=  0.967 x1e-4)
+     omega=7061035.2  peak=9.7465e-05  (=  0.975 x1e-4)
+     omega=7064320.8  peak=9.7666e-05  (=  0.977 x1e-4)
+     omega=7077463.1  peak=9.8776e-05  (=  0.988 x1e-4)
+     omega=7090605.5  peak=1.0012e-04  (=  1.001 x1e-4)
+     omega=7097176.7  peak=1.0072e-04  (=  1.007 x1e-4)
+     omega=7097176.7  peak=1.0072e-04  (=  1.007 x1e-4)
+     omega=7097176.7  peak=1.0072e-04  (=  1.007 x1e-4)
+     omega=7097177.4  peak=1.0072e-04  (=  1.007 x1e-4)
+     omega=7097188.2  peak=1.0072e-04  (=  1.007 x1e-4)
+     omega=7097360.4  peak=1.0073e-04  (=  1.007 x1e-4)
+     omega=7098738.5  peak=1.0078e-04  (=  1.008 x1e-4)
+     omega=7098738.5  peak=1.0078e-04  (=  1.008 x1e-4)
+     omega=7098738.5  peak=1.0078e-04  (=  1.008 x1e-4)
+     omega=7098739.2  peak=1.0078e-04  (=  1.008 x1e-4)
+     omega=7098750.0  peak=1.0078e-04  (=  1.008 x1e-4)
+     omega=7098922.2  peak=1.0077e-04  (=  1.008 x1e-4)
+     omega=7100300.3  peak=1.0061e-04  (=  1.006 x1e-4)
+     omega=7100300.3  peak=1.0061e-04  (=  1.006 x1e-4)
+     omega=7100300.4  peak=1.0061e-04  (=  1.006 x1e-4)
+     omega=7100301.0  peak=1.0061e-04  (=  1.006 x1e-4)
+     omega=7100311.8  peak=1.0061e-04  (=  1.006 x1e-4)
+     omega=7100484.0  peak=1.0057e-04  (=  1.006 x1e-4)
+     omega=7101862.1  peak=1.0027e-04  (=  1.003 x1e-4)
+     omega=7102551.2  peak=1.0022e-04  (=  1.002 x1e-4)
+     omega=7105307.3  peak=1.0022e-04  (=  1.002 x1e-4)
+     omega=7108063.5  peak=1.0035e-04  (=  1.004 x1e-4)
+     omega=7119088.1  peak=1.0124e-04  (=  1.012 x1e-4)
+     omega=7132230.4  peak=1.0255e-04  (=  1.025 x1e-4)
+     omega=7145372.8  peak=1.0398e-04  (=  1.040 x1e-4)
+     omega=7158515.1  peak=1.0548e-04  (=  1.055 x1e-4)
+     omega=7171657.5  peak=1.0706e-04  (=  1.071 x1e-4)
+     omega=7184799.9  peak=1.0872e-04  (=  1.087 x1e-4)
+     omega=7197942.2  peak=1.1047e-04  (=  1.105 x1e-4)
+     omega=7204513.4  peak=1.1130e-04  (=  1.113 x1e-4)
+     omega=7204513.4  peak=1.1130e-04  (=  1.113 x1e-4)
+     omega=7204513.4  peak=1.1130e-04  (=  1.113 x1e-4)
+     omega=7204514.1  peak=1.1130e-04  (=  1.113 x1e-4)
+     omega=7204524.9  peak=1.1130e-04  (=  1.113 x1e-4)
+     omega=7204697.1  peak=1.1131e-04  (=  1.113 x1e-4)
+     omega=7204697.1  peak=1.1131e-04  (=  1.113 x1e-4)
+     omega=7204697.2  peak=1.1131e-04  (=  1.113 x1e-4)
+     omega=7204697.9  peak=1.1131e-04  (=  1.113 x1e-4)
+     omega=7204708.6  peak=1.1131e-04  (=  1.113 x1e-4)
+     omega=7204880.9  peak=1.1132e-04  (=  1.113 x1e-4)
+     omega=7204880.9  peak=1.1132e-04  (=  1.113 x1e-4)
+     omega=7204880.9  peak=1.1132e-04  (=  1.113 x1e-4)
+     omega=7204881.6  peak=1.1132e-04  (=  1.113 x1e-4)
+     omega=7204892.4  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7205064.6  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205064.6  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205064.7  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205065.3  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205076.1  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205248.4  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205248.4  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205248.4  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205249.1  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205259.9  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205432.1  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205432.1  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205432.2  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205432.8  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205443.6  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205615.9  peak=1.1138e-04  (=  1.114 x1e-4)
+     omega=7205615.9  peak=1.1138e-04  (=  1.114 x1e-4)
+     omega=7205615.9  peak=1.1138e-04  (=  1.114 x1e-4)
+     omega=7205616.6  peak=1.1138e-04  (=  1.114 x1e-4)
+     omega=7205627.3  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205713.5  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205713.5  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205713.5  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205714.2  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205724.9  peak=1.1138e-04  (=  1.114 x1e-4)
+     omega=7205897.2  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205897.2  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205897.2  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205897.9  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205908.7  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205994.8  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205994.8  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205994.9  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7205995.5  peak=1.1135e-04  (=  1.113 x1e-4)
+     omega=7206006.3  peak=1.1134e-04  (=  1.113 x1e-4)
+     omega=7206006.3  peak=1.1134e-04  (=  1.113 x1e-4)
+     omega=7206006.3  peak=1.1134e-04  (=  1.113 x1e-4)
+     omega=7206007.0  peak=1.1134e-04  (=  1.113 x1e-4)
+     omega=7206017.8  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206017.8  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206017.8  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206018.5  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206029.3  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206029.3  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206029.3  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206030.0  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206019.2  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206019.2  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206019.2  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206018.5  peak=1.1133e-04  (=  1.113 x1e-4)
+     omega=7206007.7  peak=1.1134e-04  (=  1.113 x1e-4)
+     omega=7205921.6  peak=1.1136e-04  (=  1.114 x1e-4)
+     omega=7205749.4  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7205404.8  peak=1.1137e-04  (=  1.114 x1e-4)
+     omega=7204715.8  peak=1.1131e-04  (=  1.113 x1e-4)
+     omega=7203337.7  peak=1.1116e-04  (=  1.112 x1e-4)
+     omega=7200581.6  peak=1.1082e-04  (=  1.108 x1e-4)
+     omega=7197825.4  peak=1.1045e-04  (=  1.105 x1e-4)
+     omega=7192313.1  peak=1.0972e-04  (=  1.097 x1e-4)
+     omega=7181288.5  peak=1.0827e-04  (=  1.083 x1e-4)
+     omega=7170263.9  peak=1.0689e-04  (=  1.069 x1e-4)
+     omega=7157121.5  peak=1.0532e-04  (=  1.053 x1e-4)
+     omega=7143979.2  peak=1.0382e-04  (=  1.038 x1e-4)
+     omega=7130836.8  peak=1.0240e-04  (=  1.024 x1e-4)
+     omega=7117694.5  peak=1.0111e-04  (=  1.011 x1e-4)
+     omega=7104552.1  peak=1.0019e-04  (=  1.002 x1e-4)
+     omega=7091409.8  peak=1.0020e-04  (=  1.002 x1e-4)
+     omega=7091409.8  peak=1.0020e-04  (=  1.002 x1e-4)
+     omega=7091409.7  peak=1.0020e-04  (=  1.002 x1e-4)
+     omega=7091409.0  peak=1.0020e-04  (=  1.002 x1e-4)
+     omega=7091398.3  peak=1.0020e-04  (=  1.002 x1e-4)
+     omega=7091226.0  peak=1.0018e-04  (=  1.002 x1e-4)
+     omega=7089847.9  peak=1.0005e-04  (=  1.000 x1e-4)
+     omega=7084335.6  peak=9.9467e-05  (=  0.995 x1e-4)
+     omega=7073311.0  peak=9.8383e-05  (=  0.984 x1e-4)
+     omega=7062286.4  peak=9.7537e-05  (=  0.975 x1e-4)
+     omega=7056774.1  peak=9.7238e-05  (=  0.972 x1e-4)
+     omega=7045749.5  peak=9.6509e-05  (=  0.965 x1e-4)
+     omega=7034724.9  peak=9.5663e-05  (=  0.957 x1e-4)
+     omega=7023700.3  peak=9.4910e-05  (=  0.949 x1e-4)
+     omega=7018188.0  peak=9.4536e-05  (=  0.945 x1e-4)
+     omega=7007163.4  peak=9.3790e-05  (=  0.938 x1e-4)
+     omega=6996138.8  peak=9.3075e-05  (=  0.931 x1e-4)
+     omega=6985114.1  peak=9.2365e-05  (=  0.924 x1e-4)
+     omega=6971971.8  peak=9.1513e-05  (=  0.915 x1e-4)
+     omega=6958829.4  peak=9.0694e-05  (=  0.907 x1e-4)
+     omega=6945687.1  peak=8.9903e-05  (=  0.899 x1e-4)
+     omega=6932544.7  peak=8.9138e-05  (=  0.891 x1e-4)
+     omega=6919402.4  peak=8.8388e-05  (=  0.884 x1e-4)
+     omega=6906260.0  peak=8.7645e-05  (=  0.876 x1e-4)
+     omega=6893117.6  peak=8.6906e-05  (=  0.869 x1e-4)
+     omega=6879975.3  peak=8.6203e-05  (=  0.862 x1e-4)
+     omega=6866832.9  peak=8.5576e-05  (=  0.856 x1e-4)
+     omega=6853690.6  peak=8.4954e-05  (=  0.850 x1e-4)
+     omega=6840548.2  peak=8.4347e-05  (=  0.843 x1e-4)
+     omega=6827405.8  peak=8.3760e-05  (=  0.838 x1e-4)
+     omega=6814263.5  peak=8.3198e-05  (=  0.832 x1e-4)
+     omega=6801121.1  peak=8.2663e-05  (=  0.827 x1e-4)
+     omega=6787978.8  peak=8.2145e-05  (=  0.821 x1e-4)
+     omega=6774836.4  peak=8.1642e-05  (=  0.816 x1e-4)
+     omega=6761694.0  peak=8.1152e-05  (=  0.812 x1e-4)
+     omega=6748551.7  peak=8.0669e-05  (=  0.807 x1e-4)
+     omega=6735409.3  peak=8.0203e-05  (=  0.802 x1e-4)
+     omega=6722267.0  peak=7.9749e-05  (=  0.797 x1e-4)
+     omega=6709124.6  peak=7.9307e-05  (=  0.793 x1e-4)
+     omega=6695982.2  peak=7.8875e-05  (=  0.789 x1e-4)
+     omega=6682839.9  peak=7.8454e-05  (=  0.785 x1e-4)
+     omega=6669697.5  peak=7.8042e-05  (=  0.780 x1e-4)
+     omega=6656555.2  peak=7.7641e-05  (=  0.776 x1e-4)
+     omega=6643412.8  peak=7.7248e-05  (=  0.772 x1e-4)
+     omega=6630270.4  peak=7.6864e-05  (=  0.769 x1e-4)
+     omega=6617128.1  peak=7.6488e-05  (=  0.765 x1e-4)
+     omega=6603985.7  peak=7.6120e-05  (=  0.761 x1e-4)
+     omega=6590843.4  peak=7.5762e-05  (=  0.758 x1e-4)
+     omega=6577701.0  peak=7.5412e-05  (=  0.754 x1e-4)
+     omega=6564558.6  peak=7.5069e-05  (=  0.751 x1e-4)
+     omega=6551416.3  peak=7.4731e-05  (=  0.747 x1e-4)
+     omega=6538273.9  peak=7.4392e-05  (=  0.744 x1e-4)
+     omega=6525131.6  peak=7.4058e-05  (=  0.741 x1e-4)
+     omega=6511989.2  peak=7.3732e-05  (=  0.737 x1e-4)
+     omega=6498846.8  peak=7.3420e-05  (=  0.734 x1e-4)
+     omega=6485704.5  peak=7.3115e-05  (=  0.731 x1e-4)
+     omega=6472562.1  peak=7.2814e-05  (=  0.728 x1e-4)
+     omega=6459419.8  peak=7.2515e-05  (=  0.725 x1e-4)
+     omega=6446277.4  peak=7.2222e-05  (=  0.722 x1e-4)
+     omega=6433135.0  peak=7.1936e-05  (=  0.719 x1e-4)
+     omega=6419992.7  peak=7.1649e-05  (=  0.716 x1e-4)
+     omega=6406850.3  peak=7.1347e-05  (=  0.713 x1e-4)
+     omega=6393708.0  peak=7.1025e-05  (=  0.710 x1e-4)
+     omega=6380565.6  peak=7.0703e-05  (=  0.707 x1e-4)
+     omega=6367423.2  peak=7.0415e-05  (=  0.704 x1e-4)
+     omega=6354280.9  peak=7.0183e-05  (=  0.702 x1e-4)
+     omega=6341138.5  peak=7.0007e-05  (=  0.700 x1e-4)
+     omega=6327996.2  peak=6.9875e-05  (=  0.699 x1e-4)
+     omega=6314853.8  peak=6.9771e-05  (=  0.698 x1e-4)
+     omega=6301711.4  peak=6.9660e-05  (=  0.697 x1e-4)
+     omega=6288569.1  peak=6.9470e-05  (=  0.695 x1e-4)
+     omega=6275426.7  peak=6.9139e-05  (=  0.691 x1e-4)
+     omega=6262284.4  peak=6.8684e-05  (=  0.687 x1e-4)
+     omega=6249142.0  peak=6.8180e-05  (=  0.682 x1e-4)
+     omega=6235999.6  peak=6.7683e-05  (=  0.677 x1e-4)
+     omega=6222857.3  peak=6.7238e-05  (=  0.672 x1e-4)
+     omega=6209714.9  peak=6.6878e-05  (=  0.669 x1e-4)
+     omega=6196572.6  peak=6.6671e-05  (=  0.667 x1e-4)
+     omega=6183430.2  peak=6.6592e-05  (=  0.666 x1e-4)
+     omega=6170287.8  peak=6.6612e-05  (=  0.666 x1e-4)
+     omega=6157145.5  peak=6.6725e-05  (=  0.667 x1e-4)
+     omega=6144003.1  peak=6.6895e-05  (=  0.669 x1e-4)
+     omega=6130860.8  peak=6.7077e-05  (=  0.671 x1e-4)
+     omega=6117718.4  peak=6.7211e-05  (=  0.672 x1e-4)
+     omega=6104576.0  peak=6.7212e-05  (=  0.672 x1e-4)
+     omega=6091433.7  peak=6.6980e-05  (=  0.670 x1e-4)
+     omega=6078291.3  peak=6.6537e-05  (=  0.665 x1e-4)
+     omega=6065149.0  peak=6.6014e-05  (=  0.660 x1e-4)
+     omega=6052006.6  peak=6.5490e-05  (=  0.655 x1e-4)
+     omega=6038864.2  peak=6.5003e-05  (=  0.650 x1e-4)
+     omega=6025721.9  peak=6.4546e-05  (=  0.645 x1e-4)
+     omega=6012579.5  peak=6.4110e-05  (=  0.641 x1e-4)
+     omega=5999437.2  peak=6.3688e-05  (=  0.637 x1e-4)
+     omega=5986294.8  peak=6.3277e-05  (=  0.633 x1e-4)
+     omega=5973152.4  peak=6.2883e-05  (=  0.629 x1e-4)
+     omega=5960010.1  peak=6.2503e-05  (=  0.625 x1e-4)
+     omega=5946867.7  peak=6.2138e-05  (=  0.621 x1e-4)
+     omega=5933725.4  peak=6.1783e-05  (=  0.618 x1e-4)
+     omega=5920583.0  peak=6.1441e-05  (=  0.614 x1e-4)
+     omega=5907440.6  peak=6.1119e-05  (=  0.611 x1e-4)
+     omega=5894298.3  peak=6.0983e-05  (=  0.610 x1e-4)
+     omega=5881155.9  peak=6.1023e-05  (=  0.610 x1e-4)
+     omega=5868013.6  peak=6.1089e-05  (=  0.611 x1e-4)
+     omega=5854871.2  peak=6.1145e-05  (=  0.611 x1e-4)
+     omega=5841728.8  peak=6.1216e-05  (=  0.612 x1e-4)
+     omega=5828586.5  peak=6.1360e-05  (=  0.614 x1e-4)
+     omega=5815444.1  peak=6.1608e-05  (=  0.616 x1e-4)
+     omega=5802301.8  peak=6.1902e-05  (=  0.619 x1e-4)
+     omega=5789159.4  peak=6.2092e-05  (=  0.621 x1e-4)
+     omega=5776017.0  peak=6.2064e-05  (=  0.621 x1e-4)
+     omega=5762874.7  peak=6.1826e-05  (=  0.618 x1e-4)
+     omega=5749732.3  peak=6.1465e-05  (=  0.615 x1e-4)
+     omega=5736590.0  peak=6.1058e-05  (=  0.611 x1e-4)
+     omega=5723447.6  peak=6.0650e-05  (=  0.606 x1e-4)
+     omega=5710305.2  peak=6.0256e-05  (=  0.603 x1e-4)
+     omega=5697162.9  peak=5.9879e-05  (=  0.599 x1e-4)
+     omega=5684020.5  peak=5.9517e-05  (=  0.595 x1e-4)
+     omega=5670878.2  peak=5.9166e-05  (=  0.592 x1e-4)
+     omega=5657735.8  peak=5.8824e-05  (=  0.588 x1e-4)
+     omega=5644593.4  peak=5.8493e-05  (=  0.585 x1e-4)
+     omega=5631451.1  peak=5.8171e-05  (=  0.582 x1e-4)
+     omega=5618308.7  peak=5.7853e-05  (=  0.579 x1e-4)
+     omega=5605166.4  peak=5.7536e-05  (=  0.575 x1e-4)
+     omega=5592024.0  peak=5.7219e-05  (=  0.572 x1e-4)
+     omega=5578881.6  peak=5.6901e-05  (=  0.569 x1e-4)
+     omega=5565739.3  peak=5.6580e-05  (=  0.566 x1e-4)
+     omega=5552596.9  peak=5.6262e-05  (=  0.563 x1e-4)
+     omega=5539454.6  peak=5.5940e-05  (=  0.559 x1e-4)
+     omega=5526312.2  peak=5.5619e-05  (=  0.556 x1e-4)
+     omega=5513169.8  peak=5.5296e-05  (=  0.553 x1e-4)
+     omega=5500027.5  peak=5.4974e-05  (=  0.550 x1e-4)
+     omega=5486885.1  peak=5.4652e-05  (=  0.547 x1e-4)
+     omega=5473742.8  peak=5.4331e-05  (=  0.543 x1e-4)
+     omega=5460600.4  peak=5.4010e-05  (=  0.540 x1e-4)
+     omega=5447458.0  peak=5.3691e-05  (=  0.537 x1e-4)
+     omega=5434315.7  peak=5.3372e-05  (=  0.534 x1e-4)
+     omega=5421173.3  peak=5.3055e-05  (=  0.531 x1e-4)
+     omega=5408031.0  peak=5.2739e-05  (=  0.527 x1e-4)
+     omega=5394888.6  peak=5.2424e-05  (=  0.524 x1e-4)
+     omega=5381746.2  peak=5.2109e-05  (=  0.521 x1e-4)
+     omega=5368603.9  peak=5.1797e-05  (=  0.518 x1e-4)
+     omega=5355461.5  peak=5.1488e-05  (=  0.515 x1e-4)
+     omega=5342319.2  peak=5.1183e-05  (=  0.512 x1e-4)
+     omega=5329176.8  peak=5.0879e-05  (=  0.509 x1e-4)
+     omega=5316034.4  peak=5.0578e-05  (=  0.506 x1e-4)
+     omega=5302892.1  peak=5.0279e-05  (=  0.503 x1e-4)
+     omega=5289749.7  peak=4.9980e-05  (=  0.500 x1e-4)
+     omega=5276607.4  peak=4.9684e-05  (=  0.497 x1e-4)
+     omega=5263465.0  peak=4.9390e-05  (=  0.494 x1e-4)
+     omega=5250322.6  peak=4.9101e-05  (=  0.491 x1e-4)
+     omega=5237180.3  peak=4.8821e-05  (=  0.488 x1e-4)
+     omega=5224037.9  peak=4.8563e-05  (=  0.486 x1e-4)
+     omega=5210895.6  peak=4.8350e-05  (=  0.484 x1e-4)
+     omega=5197753.2  peak=4.8203e-05  (=  0.482 x1e-4)
+     omega=5184610.8  peak=4.8091e-05  (=  0.481 x1e-4)
+     omega=5171468.5  peak=4.7934e-05  (=  0.479 x1e-4)
+     omega=5158326.1  peak=4.7709e-05  (=  0.477 x1e-4)
+     omega=5145183.8  peak=4.7448e-05  (=  0.474 x1e-4)
+     omega=5132041.4  peak=4.7176e-05  (=  0.472 x1e-4)
+     omega=5118899.0  peak=4.6906e-05  (=  0.469 x1e-4)
+     omega=5105756.7  peak=4.6641e-05  (=  0.466 x1e-4)
+     omega=5092614.3  peak=4.6382e-05  (=  0.464 x1e-4)
+     omega=5079472.0  peak=4.6129e-05  (=  0.461 x1e-4)
+     omega=5066329.6  peak=4.5882e-05  (=  0.459 x1e-4)
+     omega=5053187.2  peak=4.5639e-05  (=  0.456 x1e-4)
+     omega=5040044.9  peak=4.5401e-05  (=  0.454 x1e-4)
+     omega=5026902.5  peak=4.5168e-05  (=  0.452 x1e-4)
+     omega=5013760.2  peak=4.4938e-05  (=  0.449 x1e-4)
+     omega=5000617.8  peak=4.4712e-05  (=  0.447 x1e-4)
+     omega=4987475.4  peak=4.4489e-05  (=  0.445 x1e-4)
+
+Figure saved: C:\Users\yanni\Desktop\TUM\Bachelorarbeit\Fast_numerical_solution_for_nonlinear_FE_dynamics\code\pyhbm\examples\rod_example\rod_vibroimpact_frc.png
+C:\Users\yanni\Desktop\TUM\Bachelorarbeit\Fast_numerical_solution_for_nonlinear_FE_dynamics\code\pyhbm\examples\rod_example\main.py:292: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()
