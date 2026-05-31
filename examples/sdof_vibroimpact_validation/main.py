@@ -64,16 +64,16 @@ class SDOFVibroImpact(FBS_System):
 
 
 # ============================ parameters ====================================
-EPSILON_SCHEDULE = [1.0e0]
+EPSILON_SCHEDULE = [1.0e2]
 EPSILON          = EPSILON_SCHEDULE[0]   # first entry; FD check uses this
 MAX_POINTS_BETWEEN_PHASES = 1000          # downsample FRC before each warm-start
 
 PARAMS = dict(m=1.0, c=0.05, k=1.0, F0=0.02)   # c=0.1 -> linear amp at res ~2*g0
 GAP       = 0.1
-HARMONICS = list(range(0, 30))
+HARMONICS = list(range(0, 25))
 
 OMEGA_START = 0.5
-OMEGA_END   = 2.0
+OMEGA_END   = 1.5
 
 
 # ============================ build problem (NEW API) ======================
@@ -82,7 +82,7 @@ system   = SDOFVibroImpact(**PARAMS)
 HarmonicBalanceMethod.update_dependencies(HARMONICS, system.polynomial_degree)
 
 provider = NumericalFRF(system.mass_matrix, system.damping_matrix, system.stiffness_matrix)
-contact  = DLFTContact(epsilon=EPSILON, g_zero=GAP)
+contact  = DLFTContact(epsilon=EPSILON, g_zero=GAP, gamma=1e-4, lanczos_m=2, lanczos_cutoff=1)
 problem  = FBSProblem(system, provider, contact)
 
 
@@ -194,9 +194,9 @@ solver_kwargs = {
 }
 step_kwargs = {
     "base":                      2.0,    # gentler growth (was 2.0)
-    "initial_step_length":       0.005,
-    "maximum_step_length":       0.1,   # was 0.005
-    "minimum_step_length":       1e-5,   # was 1e-7 -- bail earlier instead of micro-stepping
+    "initial_step_length":       0.05,
+    "maximum_step_length":       1.0,   # was 0.005
+    "minimum_step_length":       1e-6,   # was 1e-7 -- bail earlier instead of micro-stepping
     "goal_number_of_iterations": 4,      # was 3 -- accept more iters before growing
 }
 
@@ -205,13 +205,13 @@ print("ε-sweep continuation")
 print("=" * 70)
 
 # --- Phase 1: cold start at softest ε ----------------------------------------
-solver = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem, predictor=TangentPredictorBordered)
+solver = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem, corrector_parameterization=ArcLengthParameterization)
 print(f"\nPhase 1 (cold start) at ε = {EPSILON_SCHEDULE[0]:.1e}")
 t0 = time()
 solution_set = solver.solve_and_continue(
     initial_guess                 = initial_guess,
     initial_reference_direction   = initial_reference_direction,
-    maximum_number_of_solutions   = 10000,
+    maximum_number_of_solutions   = 5000,
     angular_frequency_range       = [OMEGA_START, OMEGA_END],
     solver_kwargs                 = solver_kwargs,
     step_length_adaptation_kwargs = step_kwargs,
@@ -250,7 +250,7 @@ fixed_newton_kwargs = {
 
 for eps in EPSILON_SCHEDULE[1:]:
     print(f"\nPhase 2: warm-start at ε = {eps:.1e}")
-    contact = DLFTContact(epsilon=eps, g_zero=GAP)
+    contact = DLFTContact(epsilon=eps, g_zero=GAP, gamma=1e-6, lanczos_m=1, lanczos_cutoff=1)
     problem = FBSProblem(system, provider, contact)
     solver  = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem)
 

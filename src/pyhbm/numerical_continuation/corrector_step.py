@@ -18,10 +18,10 @@ class NewtonRaphson(object):
 		self._residue0_norm = None
 
 	def is_converged(self) -> bool:
-		if norm(self.residue) < self.absolute_tolerance:
+		if norm(self.residue)/norm(self.x) < self.absolute_tolerance:
 			return True
 		if self.relative_tolerance > 0 and self._residue0_norm is not None:
-			if norm(self.residue) < self.relative_tolerance * self._residue0_norm:
+			if norm(self.residue)/norm(self.x) < self.relative_tolerance * self._residue0_norm:
 				return True
 		return False
 

@@ -98,20 +98,79 @@ class DLFTContact(NonlinearMethod):
     Dynamic Lagrangian Frequency-Time (DLFT) normal contact.
 
     Prediction:  λ_p = IDFT[Z_r (F_adm - x_r)] + ε (x_r - g₀)
-    Correction:  λ   = max(0, λ_p)
-    Force:       λ̃   = DFT[λ]
+    Correction:  λ   = c(λ_p)
+    Force:       λ̃   = Σ · DFT[λ]      (Σ = Lanczos filter on the forward DFT)
+
+    Two Gibbs-mitigation techniques (Colaïtis & Batailly, JSV 502, 2021, §2.5)
+    are available and OFF by default:
+
+    * Regularized correction (``gamma`` > 0): the non-smooth correction
+      max(0, λ_p) is replaced by its hyperbolic smoothing
+          c(λ_p) = λ_p/2 + sqrt((λ_p/2)² + γ²),
+      whose derivative (the per-sample contact mask) is
+          c'(λ_p) = ½ (1 + (λ_p/2) / sqrt((λ_p/2)² + γ²)).
+      γ = 0 recovers max(0, λ_p) and the Boolean mask exactly.
+
+    * Lanczos filter (``lanczos_m`` > 0): each harmonic block of the forward
+      DFT operator is scaled by σ_n = sinc(ρ_n/(H+1))^m, ρ_n = |n| if
+      |n| ≥ C_H else 0. m = 0 gives σ_n = 1 (no filtering). The SAME σ is
+      applied to the force, its Jacobian and its ω-derivative.
 
     Bound to an FBSProblem at construction; reads B_fourier, F_ext_full,
     admittance caches, and the FRF provider through that reference.
     """
 
-    def __init__(self, epsilon: float = 1.0, g_zero: float = 0.0):
-        self.epsilon  = epsilon
-        self.g_zero   = g_zero
-        self._problem = None    # populated by bind()
+    def __init__(self, epsilon: float = 1.0, g_zero: float = 0.0,
+                 gamma: float = 0.0, lanczos_m: float = 0.0,
+                 lanczos_cutoff: int = 1):
+        self.epsilon        = epsilon
+        self.g_zero         = g_zero
+        self.gamma          = gamma           # smoothing parameter [force]; 0 => exact max(0,·)
+        self.lanczos_m      = lanczos_m       # Lanczos intensity; 0 => no filtering
+        self.lanczos_cutoff = lanczos_cutoff  # C_H: harmonics below it are unfiltered
+        self._problem       = None            # populated by bind()
+        self._sigma         = None            # cached Lanczos factors σ_n
+        self._sigma_key     = None            # (harmonics, H, m, C_H) the cache was built for
 
     def bind(self, problem) -> None:
         self._problem = problem
+
+    # --- regularization + Lanczos helpers ---
+
+    def _correct(self, lambda_p):
+        """Pointwise correction c(λ_p) and its derivative (the contact mask)."""
+        if self.gamma == 0.0:
+            mask = lambda_p > 0.0
+            return np.where(mask, lambda_p, 0.0), mask
+        u = 0.5 * lambda_p
+        s = np.sqrt(u * u + self.gamma ** 2)
+        lambda_corr = u + s
+        mask = 0.5 * (1.0 + u / s)
+        return lambda_corr, mask
+
+    def _get_lanczos_sigma(self):
+        """Per-harmonic Lanczos factors σ_n, cached for the current harmonics set."""
+        harmonics = Fourier.harmonics
+        H   = Fourier.harmonic_truncation_order
+        key = (tuple(harmonics), H, self.lanczos_m, self.lanczos_cutoff)
+        if self._sigma_key != key:
+            sigma = np.ones(len(harmonics))
+            if self.lanczos_m != 0.0:
+                for i, n in enumerate(harmonics):
+                    nn  = abs(int(n))
+                    rho = nn if nn >= self.lanczos_cutoff else 0
+                    X   = rho / (H + 1)
+                    if X != 0.0:
+                        sigma[i] = (np.sin(np.pi * X) / (np.pi * X)) ** self.lanczos_m
+            self._sigma     = sigma
+            self._sigma_key = key
+        return self._sigma
+
+    def _apply_lanczos_coeffs(self, coefficients):
+        """Scale forward-DFT force coefficients (Nh, n_int, 1) by σ_n."""
+        if self.lanczos_m == 0.0:
+            return coefficients
+        return coefficients * self._get_lanczos_sigma()[:, None, None]
 
     # --- internal helpers (use self._problem) ---
 
@@ -141,16 +200,10 @@ class DLFTContact(NonlinearMethod):
             Fourier_Real.compute_time_series(x.fourier)
             q_rel  = x.fourier.time_series
             lambda_p = zr_t + self.epsilon * (q_rel - self.g_zero)
-            x.contact_mask     = lambda_p > 0.0
-            lambda_t_corr      = np.where(x.contact_mask, lambda_p, 0.0)
-            # ALPHA = 1.0e6
-            # soft_mask = 0.5 * (1.0 + np.tanh(ALPHA * lambda_p))
-            # lambda_t_corr = soft_mask * lambda_p
-            # # keep storing the discrete mask for the Jacobian too, or use the smoothed one
-            # x.contact_mask = soft_mask  # was: lambda_p > 0
-
+            lambda_t_corr, x.contact_mask = self._correct(lambda_p)
             lambda_x_corr      = Fourier_Real.new_from_time_series(lambda_t_corr)
-            x.lambda_corrected = vstack(lambda_x_corr.coefficients)
+            coeffs             = self._apply_lanczos_coeffs(lambda_x_corr.coefficients)
+            x.lambda_corrected = vstack(coeffs)
         return x.lambda_corrected
 
     def _invert_Yr_blockwise(self, Yr, n_int):
@@ -170,7 +223,13 @@ class DLFTContact(NonlinearMethod):
         n_int = ode.dimension
         contact_tangent = x.contact_mask * eye(n_int)    # (Nt, n_int, n_int)
         J_mask    = JacobianFourier_Real.new_from_time_series(contact_tangent)
-        J_mask_RI = block([[J_mask.RR, J_mask.RI], [J_mask.IR, J_mask.II]])
+        if self.lanczos_m != 0.0:
+            # filter the forward DFT (output harmonics): Σ Γ⁺ diag(m) Γ
+            Sigma = kron(diag(self._get_lanczos_sigma()), eye(n_int))
+            J_mask_RI = block([[Sigma @ J_mask.RR, Sigma @ J_mask.RI],
+                               [Sigma @ J_mask.IR, Sigma @ J_mask.II]])
+        else:
+            J_mask_RI = block([[J_mask.RR, J_mask.RI], [J_mask.IR, J_mask.II]])
         Yr = self._get_Yr(x)
         Zr = self._invert_Yr_blockwise(Yr, n_int)
         complex_int_dim = Fourier.number_of_harmonics * n_int
@@ -194,7 +253,9 @@ class DLFTContact(NonlinearMethod):
             dlambda_pred.reshape(Fourier.number_of_harmonics, n_int, 1)
         )
         Fourier_Real.compute_time_series(dlambda_pred_fourier)
-        dlambda_t_corr = np.where(x.contact_mask, dlambda_pred_fourier.time_series, 0.0)
+        # chain rule: ∂λ/∂ω = c'(λ_p) · ∂λ_p/∂ω  (mask is Boolean for γ=0, float for γ>0)
+        dlambda_t_corr = x.contact_mask * dlambda_pred_fourier.time_series
         dlambda_corr   = Fourier_Real.new_from_time_series(dlambda_t_corr)
-        dlambda_v      = vstack(dlambda_corr.coefficients)
+        coeffs         = self._apply_lanczos_coeffs(dlambda_corr.coefficients)
+        dlambda_v      = vstack(coeffs)
         return vstack((dlambda_v.real, dlambda_v.imag))
