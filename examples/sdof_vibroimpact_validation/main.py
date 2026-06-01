@@ -37,7 +37,7 @@ class SDOFVibroImpact(FBS_System):
     """
     is_real_valued = True
 
-    def __init__(self, m=1.0, c=0.1, k=1.0, F0=0.02, poly_deg=100):
+    def __init__(self, m=1.0, c=0.01, k=1.0, F0=0.02, poly_deg=100):
         self.mass_matrix       = np.array([[m]])
         self.damping_matrix    = np.array([[c]])
         self.stiffness_matrix  = np.array([[k]])
@@ -64,16 +64,16 @@ class SDOFVibroImpact(FBS_System):
 
 
 # ============================ parameters ====================================
-EPSILON_SCHEDULE = [1.0e0]
+EPSILON_SCHEDULE = [1.0]
 EPSILON          = EPSILON_SCHEDULE[0]   # first entry; FD check uses this
-MAX_POINTS_BETWEEN_PHASES = 1000          # downsample FRC before each warm-start
+MAX_POINTS_BETWEEN_PHASES = 5000          # downsample FRC before each warm-start
 
 PARAMS = dict(m=1.0, c=0.05, k=1.0, F0=0.02)   # c=0.1 -> linear amp at res ~2*g0
 GAP       = 0.1
 HARMONICS = list(range(0, 30))
 
 OMEGA_START = 0.5
-OMEGA_END   = 2.0
+OMEGA_END   = 2.5
 
 
 # ============================ build problem (NEW API) ======================
@@ -196,7 +196,7 @@ step_kwargs = {
     "base":                      2.0,    # gentler growth (was 2.0)
     "initial_step_length":       0.005,
     "maximum_step_length":       0.1,   # was 0.005
-    "minimum_step_length":       1e-5,   # was 1e-7 -- bail earlier instead of micro-stepping
+    "minimum_step_length":       1e-6,   # was 1e-7 -- bail earlier instead of micro-stepping
     "goal_number_of_iterations": 4,      # was 3 -- accept more iters before growing
 }
 
@@ -205,7 +205,7 @@ print("ε-sweep continuation")
 print("=" * 70)
 
 # --- Phase 1: cold start at softest ε ----------------------------------------
-solver = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem, predictor=TangentPredictorBordered)
+solver = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem, corrector_parameterization=ArcLengthParameterization)
 print(f"\nPhase 1 (cold start) at ε = {EPSILON_SCHEDULE[0]:.1e}")
 t0 = time()
 solution_set = solver.solve_and_continue(

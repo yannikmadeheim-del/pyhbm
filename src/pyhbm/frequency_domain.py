@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 import warnings
 from numpy import array, concatenate, unique, hstack, array_split, vstack, einsum, pi, linspace, zeros, eye, kron, diag, where, block, zeros_like, vdot, sqrt
