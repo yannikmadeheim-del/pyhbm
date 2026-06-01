@@ -298,11 +298,13 @@ def run_frc(k_rel_value,
     print(f"-> {len(omega_phys)} points, omega in "
           f"[{omega_phys.min():.1f}, {omega_phys.max():.1f}] rad/s, "
           f"peak/1e-4 in [{peak.min()/1e-4:.2f}, {peak.max()/1e-4:.2f}], {time()-t0:.1f} s")
-    return omega_phys, peak
+    # return branch + raw solution set (needed for warm-starting the rigid case)
+    return omega_phys, peak, ss, sys_k
 
 
 # one continuation branch per obstacle stiffness
-results = {kv: run_frc(kv) for kv in K_REL_VALUES}
+raw = {kv: run_frc(kv) for kv in K_REL_VALUES}
+results = {kv: (raw[kv][0], raw[kv][1]) for kv in K_REL_VALUES}
 
 
 # ============================ linear FRF (reference) ========================
@@ -339,11 +341,129 @@ for ax in axes[1, :]:
     ax.set_xlabel(r"$\omega$  [rad$\cdot$s$^{-1}$]")
 axes[0, 0].legend(loc="upper right", fontsize=8, framealpha=0.9)
 
+# ============================ NLvib CSV overlay =============================
+# Load the four CSVs produced by NLvib/validation/nlvib_vibroimpact_rod_flexible.m
+# and add them as black dot markers on each panel for cross-validation.
+import pandas as pd
+NLVIB_DIR = (Path(__file__).parent.parent.parent.parent.parent
+             / "NLvib" / "validation")
+for ax, kv in zip(axes.ravel(), K_REL_VALUES):
+    # NLvib writes e.g. nlvib_rod_flexible_kobs_0.4_krod.csv
+    csv = NLVIB_DIR / f"nlvib_rod_flexible_kobs_{kv:g}_krod.csv"
+    if csv.exists():
+        df = pd.read_csv(csv)
+        ax.plot(df["omega"], df["A_peak"] / SCALE, 'k.',
+                ms=2.5, label="NLvib HB", zorder=5)
+    else:
+        print(f"  [overlay] CSV not found: {csv.name}")
+
+# refresh legend only on first panel (now has NLvib entry if CSV present)
+axes[0, 0].legend(loc="upper right", fontsize=8, framealpha=0.9)
+
 fig.suptitle("NFRC vs. obstacle stiffness  (rod + flexible wall as 2 substructures, "
-             "DLFT-HBM)  -- cf. Vadcard Fig. 17", fontsize=12)
+             "DLFT-HBM  vs  NLvib HBM)  -- cf. Vadcard Fig. 17", fontsize=12)
 fig.tight_layout(rect=[0, 0, 1, 0.97])
 
 out = Path(__file__).parent / "rod_vibroimpact_frc.png"
 fig.savefig(out, dpi=150)
 print(f"\nFigure saved: {out}")
+
+
+# ============================ rigid wall: warm-start from k_rel=40 ==========
+# The rigid wall is approached as k_rel → ∞.  We use k_rel = 1000 as a proxy
+# (k_obs = 2.52e12 N/m ≫ rod dynamic stiffness) and warm-start Newton from
+# the last converged point of the k_rel=40 branch.  Because the DOF structure
+# is identical (same B_coupling, same obstacle DOF), the Fourier coefficients
+# transfer directly; only the FRF/impedance changes.
+
+print("\n" + "=" * 70)
+print("Rigid wall (k_rel=1000, warm-start from k_rel=40 branch)")
+print("=" * 70)
+
+K_REL_RIGID = 1000.0
+ss_40  = raw[40.0][2]          # raw solution set from k_rel=40
+sys_40 = raw[40.0][3]          # system object from k_rel=40
+
+sys_rigid  = RodVibroImpactFlexible(k_rel=K_REL_RIGID, F0=F0, poly_deg=POLY_DEG)
+prov_rigid = NumericalFRF(sys_rigid.mass_matrix,
+                          sys_rigid.damping_matrix,
+                          sys_rigid.stiffness_matrix)
+cont_rigid = DLFTContact(epsilon=EPSILON, g_zero=GAP)
+prob_rigid = FBSProblem(sys_rigid, prov_rigid, cont_rigid)
+
+solver_rigid = HarmonicBalanceMethod(
+    harmonics=HARMONICS, freq_domain_ode=prob_rigid,
+    corrector_parameterization=OrthogonalParameterization,
+    predictor=TangentPredictorBordered,
+)
+
+# Use the last solution of the 40*k_rod branch as initial guess.
+# Both systems share the same Newton unknown (relative DOF x_r = u_B - u_w),
+# so the Fourier coefficients transfer directly.
+ig_rigid = FourierOmegaPoint(ss_40.fourier[-1], ss_40.omega[-1])
+rd_rigid = FourierOmegaPoint.new_from_first_harmonic(
+    np.zeros((1, 1), complex), omega=1.0)
+
+step_kwargs_rigid = {
+    "base":                      2.0,
+    "initial_step_length":       0.001,
+    "maximum_step_length":       0.003,
+    "minimum_step_length":       1e-7,
+    "goal_number_of_iterations": 3,
+}
+
+t0 = time()
+ss_rigid = solver_rigid.solve_and_continue(
+    initial_guess                 = ig_rigid,
+    initial_reference_direction   = rd_rigid,
+    maximum_number_of_solutions   = 5000,
+    angular_frequency_range       = [OMEGA_START, OMEGA_END],
+    solver_kwargs                 = solver_kwargs,
+    step_length_adaptation_kwargs = step_kwargs_rigid,
+    jacobian_update_frequency     = 1,
+)
+
+omega_hat_r  = np.array(ss_rigid.omega)
+omega_phys_r = omega_hat_r * OMEGA_1
+peak_r = np.zeros_like(omega_phys_r)
+for i, (four, o_hat) in enumerate(zip(ss_rigid.fourier, omega_hat_r)):
+    full = prob_rigid.compute_full_response(four, o_hat)
+    Fourier_Real.compute_time_series(full)
+    peak_r[i] = float(np.max(np.abs(full.time_series[:, sys_rigid.rod_tip_idx, 0])))
+
+print(f"-> {len(omega_phys_r)} points, omega in "
+      f"[{omega_phys_r.min():.1f}, {omega_phys_r.max():.1f}] rad/s, "
+      f"peak/1e-4 in [{peak_r.min()/1e-4:.2f}, {peak_r.max()/1e-4:.2f}], {time()-t0:.1f} s")
+
+
+# ============================ plot: rigid vs flexible comparison =============
+
+fig2, ax2 = plt.subplots(figsize=(9.0, 4.5))
+
+ax2.plot(om_lin, peak_lin / SCALE, ':',  color="k", lw=1.0, label="linear FRF")
+ax2.axhline(GAP / SCALE,                  color="red", ls="--", lw=1.2, label="$g_0$")
+
+# flexible branches (faded orange, labeled by k_rel)
+colors_fl = ["#FACC8E", "#F0A046", "#E8820C", "#C05800"]
+for (kv, col) in zip(K_REL_VALUES, colors_fl):
+    om_k, pk_k = results[kv]
+    ax2.plot(om_k, pk_k / SCALE, '-', color=col, lw=1.4,
+             label=f"flexible $k_\\mathrm{{obs}}={kv:g}k_\\mathrm{{rod}}$")
+
+# rigid branch (thick blue)
+ax2.plot(omega_phys_r, peak_r / SCALE, '-', color="#1F77B4", lw=2.4,
+         label=f"near-rigid ($k_\\mathrm{{obs}}={K_REL_RIGID:.0f}k_\\mathrm{{rod}}$)")
+
+ax2.set_xlim(*XLIM); ax2.set_ylim(*YLIM)
+ax2.set_xlabel(r"$\omega$  [rad$\cdot$s$^{-1}$]")
+ax2.set_ylabel(r"$\|x(t)\|_\infty$  [$\times 10^{-4}$ m]")
+ax2.set_title("Flexible → rigid obstacle: stiffness sweep + warm-started rigid branch")
+ax2.legend(loc="upper right", fontsize=8, framealpha=0.9, ncol=2)
+ax2.grid(True, alpha=0.25)
+fig2.tight_layout()
+
+out2 = Path(__file__).parent / "rod_vibroimpact_rigid_vs_flexible.png"
+fig2.savefig(out2, dpi=150)
+print(f"Figure saved: {out2}")
+
 plt.show()
