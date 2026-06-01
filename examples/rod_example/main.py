@@ -154,7 +154,7 @@ class RodVibroImpactFlexible(FBS_System):
 
 # ============================ parameters ====================================
 GAP       = 0.2e-3       # g0: wall offset [m]  (Vadcard Table 1)
-HARMONICS = list(range(0, 25))   # 0..20  -> H = 20
+HARMONICS = list(range(0, 21))   # 0..20  -> H = 20
 POLY_DEG  = 30                   # N = (POLY_DEG+1)*20 + 1 = 421 time samples
 F0        = 25e3                 # f_ex: harmonic forcing at node B [N]  (Vadcard)
 
@@ -248,11 +248,11 @@ print(f"linear free-end amplitude at omega_start: {Q1_start:.3e} m  (gap g0 = {G
 
 solver_kwargs = {"maximum_iterations": 300, "absolute_tolerance": 1e-6}
 step_kwargs = {
-    "base":                      2.0,
+    "base":                      4.0,
     "initial_step_length":       0.002,
-    "maximum_step_length":       0.005,   # narrow w_hat window -> keep steps small
-    "minimum_step_length":       1e-8,
-    "goal_number_of_iterations": 4,
+    "maximum_step_length":       0.001,   # narrow w_hat window -> keep steps small
+    "minimum_step_length":       1e-7,
+    "goal_number_of_iterations": 3,
 }
 
 def run_frc(k_rel_value,
