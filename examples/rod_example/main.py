@@ -155,7 +155,7 @@ class RodVibroImpactFlexible(FBS_System):
 # ============================ parameters ====================================
 GAP       = 0.2e-3       # g0: wall offset [m]  (Vadcard Table 1)
 HARMONICS = list(range(0, 25))   # 0..20  -> H = 20
-POLY_DEG  = 25                   # N = (POLY_DEG+1)*20 + 1 = 421 time samples
+POLY_DEG  = 30                   # N = (POLY_DEG+1)*20 + 1 = 421 time samples
 F0        = 25e3                 # f_ex: harmonic forcing at node B [N]  (Vadcard)
 
 # Obstacle stiffnesses to sweep, as multiples of k_rod = E*A/L
@@ -256,8 +256,8 @@ step_kwargs = {
 }
 
 def run_frc(k_rel_value,
-            parameterization=OrthogonalParameterization,
-            predictor=TangentPredictorOne):
+            parameterization=ArcLengthParameterization,
+            predictor=TangentPredictorBordered):
     """Continuation sweep for one obstacle stiffness  k_obs = k_rel_value * k_rod.
 
     Rebuilds the rod + grounded-spring substructure system for this k_obs, runs the
