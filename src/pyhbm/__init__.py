@@ -35,6 +35,7 @@ from .nonlinear_method import (
     NonlinearMethod,
     AFT,
     DLFTContact,
+    DLFTFriction,
 )
 
 from .hbm_problems import (
@@ -99,7 +100,7 @@ __all__ = [
     "FrequencyBasedSubstructuring_experimental",
     # new restructured API
     "FRFProvider", "NumericalFRF", "ExperimentalFRF",
-    "NonlinearMethod", "AFT", "DLFTContact",
+    "NonlinearMethod", "AFT", "DLFTContact", "DLFTFriction",
     "FRFProblem", "FBSProblem",
     # numerical continuation
     "NewtonRaphson", "CorrectorParameterization", "OrthogonalParameterization",

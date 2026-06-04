@@ -37,12 +37,12 @@ class SDOFVibroImpact(FBS_System):
     """
     is_real_valued = True
 
-    def __init__(self, m=1.0, c=0.01, k=1.0, F0=0.02, poly_deg=100):
-        self.mass_matrix       = np.array([[m]])
-        self.damping_matrix    = np.array([[c]])
-        self.stiffness_matrix  = np.array([[k]])
-        self.B_coupling        = np.array([[1.0]])      # 1 interface DOF
-        self.total_dimension   = 1
+    def __init__(self, m=1.0, c=0.01, k=1.0, F0=0.02, poly_deg=100, k_rel=100):
+        self.mass_matrix       = np.array([[m, 0],[0, 0]])
+        self.damping_matrix    = np.array([[c, 0],[0, 0]])
+        self.stiffness_matrix  = np.array([[k, 0],[0, k_rel*k]])
+        self.B_coupling        = np.array([[1.0, -1.0]])      # 1 interface DOF
+        self.total_dimension   = 2
         self.dimension         = 1                       # n_int
         self.polynomial_degree = poly_deg
         self.F0 = F0
@@ -64,10 +64,9 @@ class SDOFVibroImpact(FBS_System):
 
 
 # ============================ parameters ====================================
-EPSILON_SCHEDULE = [1.0]
-EPSILON          = EPSILON_SCHEDULE[0]   # first entry; FD check uses this
+EPSILON          = 1.0   # first entry; FD check uses this
 MAX_POINTS_BETWEEN_PHASES = 5000          # downsample FRC before each warm-start
-
+k_rel_shedule = [100, 150]
 PARAMS = dict(m=1.0, c=0.05, k=1.0, F0=0.02)   # c=0.1 -> linear amp at res ~2*g0
 GAP       = 0.1
 HARMONICS = list(range(0, 30))
@@ -175,9 +174,9 @@ print("=" * 70)
 Z  = -OMEGA_START**2 * system.mass_matrix \
    + 1j * OMEGA_START * system.damping_matrix \
    +                    system.stiffness_matrix
-Q1 = np.linalg.solve(Z, np.array([PARAMS['F0']])).reshape(1, 1)
 
-initial_guess               = FourierOmegaPoint.new_from_first_harmonic(Q1,                  omega=OMEGA_START)
+
+initial_guess               = FourierOmegaPoint.zero_amplitude(dimension=system.dimension, omega=OMEGA_START)
 initial_reference_direction = FourierOmegaPoint.new_from_first_harmonic(np.zeros((1, 1), complex), omega=1.0)
 
 
@@ -195,7 +194,7 @@ solver_kwargs = {
 step_kwargs = {
     "base":                      2.0,    # gentler growth (was 2.0)
     "initial_step_length":       0.005,
-    "maximum_step_length":       0.1,   # was 0.005
+    "maximum_step_length":       1.0,   # was 0.005
     "minimum_step_length":       1e-6,   # was 1e-7 -- bail earlier instead of micro-stepping
     "goal_number_of_iterations": 4,      # was 3 -- accept more iters before growing
 }
@@ -206,7 +205,7 @@ print("=" * 70)
 
 # --- Phase 1: cold start at softest ε ----------------------------------------
 solver = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem, corrector_parameterization=ArcLengthParameterization)
-print(f"\nPhase 1 (cold start) at ε = {EPSILON_SCHEDULE[0]:.1e}")
+print(f"\nPhase 1 (cold start) at ε = {EPSILON:.1e}")
 t0 = time()
 solution_set = solver.solve_and_continue(
     initial_guess                 = initial_guess,
@@ -248,9 +247,9 @@ fixed_newton_kwargs = {
     "jacobian_reuse_delta_threshold": 1e-3,
 }
 
-for eps in EPSILON_SCHEDULE[1:]:
+for k_rel in k_rel_shedule:
     print(f"\nPhase 2: warm-start at ε = {eps:.1e}")
-    contact = DLFTContact(epsilon=eps, g_zero=GAP)
+    contact = DLFTContact(epsilon=EPSILON, g_zero=GAP, k_rel=k_rel)
     problem = FBSProblem(system, provider, contact)
     solver  = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem)
 
@@ -270,7 +269,7 @@ for eps in EPSILON_SCHEDULE[1:]:
             failures += 1
 
     if not refined_fouriers:
-        print(f"  ALL {failures} points failed at ε = {eps:.1e}; "
+        print(f"  ALL {failures} points failed at k_obs = {k_rel:.1e}*k_ref; "
               f"stopping sweep. Keeping previous FRC.")
         break
 

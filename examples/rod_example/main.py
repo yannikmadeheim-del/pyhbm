@@ -168,7 +168,7 @@ rod = RodVibroImpactFlexible(k_rel=1.0, F0=F0, poly_deg=POLY_DEG)
 OMEGA_1 = rod.omega_modes[0]
 # DLFT penalty: stiffness units; large vs the interface dynamic stiffness ~ k_rod.
 # Converged solution is epsilon-independent (Vadcard 2022), so any large value works.
-EPSILON   = 1.0e2 * rod.k_rod
+EPSILON   = 1.0e1 * rod.k_rod
 
 print(f"first axial mode: omega_1 = {OMEGA_1:.1f} rad/s  ({OMEGA_1/2/np.pi:.1f} Hz)")
 print(f"rod static stiffness k_rod = E*A/L = {rod.k_rod:.3e} N/m")
@@ -324,141 +324,232 @@ XLIM  = (5.8e4, 7.4e4)      # Vadcard Fig. 17 frequency window [rad/s]
 YLIM  = (0.0, 5.5)
 PANEL = ["(a)", "(b)", "(c)", "(d)"]
 
+import pandas as pd
+# CSVs are saved by MATLAB next to this script (MATLAB's cwd when run from editor)
+NLVIB_DIR = Path(__file__).parent
+
+def _nlvib_csv(kv):
+    """Return the NLvib CSV path for a given k_rel value, tolerating int/float names."""
+    # MATLAB writes e.g. 4 not 4.0, but 0.4 stays as 0.4
+    stem = f"nlvib_rod_flexible_kobs_{kv:g}_krod.csv"
+    return NLVIB_DIR / stem
+
 fig, axes = plt.subplots(2, 2, figsize=(11.0, 7.5), sharex=True, sharey=True)
 for ax, lbl, kv in zip(axes.ravel(), PANEL, K_REL_VALUES):
     om_k, peak_k = results[kv]
-    ax.plot(om_lin, peak_lin / SCALE, ':',  color="k", lw=1.0, label="linear")
-    ax.axhline(GAP / SCALE,                  color="red", ls="--", lw=1.2, label="$g_0$")
+
+    # --- data sources ---
+    ax.plot(om_lin, peak_lin / SCALE, ':',  color="k", lw=1.0,
+            label="Linear FRF (no contact)")
+    ax.axhline(GAP / SCALE, color="red", ls="--", lw=1.2,
+               label=r"Contact threshold $g_0$")
     ax.plot(om_k, peak_k / SCALE, '-', color="#E8820C", lw=1.8,
-            label="DLFT-HBM (flexible)")
+            label="pyhbm DLFT-FBS\n(2-substructure, flexible wall)")
+
+    # NLvib independent reference (green dashed)
+    csv = _nlvib_csv(kv)
+    if csv.exists():
+        df = pd.read_csv(csv)
+        ax.plot(df["omega"], df["A_peak"] / SCALE, '--', color="#2CA02C", lw=1.4,
+                zorder=5, label="NLvib HBM reference\n(penalty unilateral spring, MATLAB)")
+    else:
+        print(f"  [overlay] CSV not found: {csv.name}")
+
     ax.set_title(rf"{lbl}  $k_\mathrm{{obs}} = {kv:g}\,k_\mathrm{{rod}}$", fontsize=11)
     ax.set_xlim(*XLIM); ax.set_ylim(*YLIM)
     ax.grid(True, alpha=0.25)
+    ax.legend(loc="upper right", fontsize=7.5, framealpha=0.9)
 
 for ax in axes[:, 0]:
     ax.set_ylabel(r"$\|x(t)\|_\infty$  [$\times 10^{-4}$ m]")
 for ax in axes[1, :]:
     ax.set_xlabel(r"$\omega$  [rad$\cdot$s$^{-1}$]")
-axes[0, 0].legend(loc="upper right", fontsize=8, framealpha=0.9)
 
-# ============================ NLvib CSV overlay =============================
-# Load the four CSVs produced by NLvib/validation/nlvib_vibroimpact_rod_flexible.m
-# and add them as black dot markers on each panel for cross-validation.
-import pandas as pd
-NLVIB_DIR = (Path(__file__).parent.parent.parent.parent.parent
-             / "NLvib" / "validation")
-for ax, kv in zip(axes.ravel(), K_REL_VALUES):
-    # NLvib writes e.g. nlvib_rod_flexible_kobs_0.4_krod.csv
-    csv = NLVIB_DIR / f"nlvib_rod_flexible_kobs_{kv:g}_krod.csv"
-    if csv.exists():
-        df = pd.read_csv(csv)
-        ax.plot(df["omega"], df["A_peak"] / SCALE, 'k.',
-                ms=2.5, label="NLvib HB", zorder=5)
-    else:
-        print(f"  [overlay] CSV not found: {csv.name}")
-
-# refresh legend only on first panel (now has NLvib entry if CSV present)
-axes[0, 0].legend(loc="upper right", fontsize=8, framealpha=0.9)
-
-fig.suptitle("NFRC vs. obstacle stiffness  (rod + flexible wall as 2 substructures, "
-             "DLFT-HBM  vs  NLvib HBM)  -- cf. Vadcard Fig. 17", fontsize=12)
-fig.tight_layout(rect=[0, 0, 1, 0.97])
+fig.suptitle(
+    "NFRC: clamped-free FE rod vs. flexible obstacle  (Vadcard JSV 531, 2022, Fig. 17)\n"
+    r"Orange $-$: pyhbm DLFT-FBS (2-substructure, rod + grounded spring, Python)   "
+    r"Black $\cdot$: NLvib HBM (penalty unilateral spring, MATLAB)",
+    fontsize=10)
+fig.tight_layout(rect=[0, 0, 1, 0.95])
 
 out = Path(__file__).parent / "rod_vibroimpact_frc.png"
 fig.savefig(out, dpi=150)
 print(f"\nFigure saved: {out}")
 
 
+# ============================ rigid wall system ==============================
+# The DLFT exact rigid-wall: just the rod (no obstacle DOF), B_coupling selects
+# u_B directly, DLFTContact enforces u_B <= g0.  No penalty approximation --
+# the converged solution is the true unilateral solution.  It is numerically
+# hard to find cold because the contact is a step discontinuity; the warm start
+# from the k_rel=40 branch bridges the gap.
+
+class RodVibroImpactRigid(FBS_System):
+    """Clamped-free rod with a RIGID wall (exact DLFT, no obstacle substructure).
+
+    The interface DOF is u_B (rod free end).  DLFTContact enforces u_B <= g0.
+    """
+    is_real_valued = True
+
+    def __init__(self, n_elem=20, L=0.13, E=210e9, rho=7800.0, A=15.6e-4,
+                 F0=1.0e4, xi=7.5e-3, poly_deg=33):
+        l = L / n_elem
+        n = n_elem
+
+        Me = (rho * A * l / 6.0) * np.array([[2.0, 1.0], [1.0, 2.0]])
+        Ke = (E * A / l)         * np.array([[1.0, -1.0], [-1.0, 1.0]])
+        M_rod = zeros((n + 1, n + 1))
+        K_rod = zeros((n + 1, n + 1))
+        for e in range(n_elem):
+            M_rod[e:e + 2, e:e + 2] += Me
+            K_rod[e:e + 2, e:e + 2] += Ke
+        M_rod = M_rod[1:, 1:]
+        K_rod = K_rod[1:, 1:]
+
+        w2, Phi = eigh(K_rod, M_rod)
+        omega_modes = np.sqrt(np.clip(w2, 0.0, None))
+        C_rod = M_rod @ Phi @ np.diag(2.0 * xi * omega_modes) @ Phi.T @ M_rod
+
+        omega_ref = omega_modes[0]
+        self.omega_ref        = omega_ref
+        self.mass_matrix      = omega_ref ** 2 * M_rod
+        self.damping_matrix   = omega_ref      * C_rod
+        self.stiffness_matrix = K_rod
+
+        # interface = rod tip u_B only (no obstacle DOF)
+        self.rod_tip_idx = n - 1
+        B = zeros((1, n)); B[0, -1] = 1.0
+        self.B_coupling = B
+
+        self.dimension        = 1
+        self.total_dimension  = n
+        self.polynomial_degree = poly_deg
+        self.F0 = F0
+        self.omega_modes = omega_modes
+        k_rod = E * A / L
+        self.k_rod = k_rod
+        self.k_ref = k_rod
+
+    def external_term(self, tau):
+        f = zeros((len(tau), self.total_dimension, 1))
+        f[:, self.rod_tip_idx, 0] = self.F0 * cos(tau)
+        return f
+
+    def interface_force(self, u_rel, udot_rel, tau):
+        return zeros((len(tau), self.dimension, 1))
+
+    def jacobian_interface_force(self, u_rel, udot_rel, tau):
+        return zeros((len(tau), self.dimension, self.dimension))
+
+    def jacobian_interface_force_qdot(self, u_rel, udot_rel, tau):
+        return zeros((len(tau), self.dimension, self.dimension))
+
+
 # ============================ rigid wall: warm-start from k_rel=40 ==========
-# The rigid wall is approached as k_rel → ∞.  We use k_rel = 1000 as a proxy
-# (k_obs = 2.52e12 N/m ≫ rod dynamic stiffness) and warm-start Newton from
-# the last converged point of the k_rel=40 branch.  Because the DOF structure
-# is identical (same B_coupling, same obstacle DOF), the Fourier coefficients
-# transfer directly; only the FRF/impedance changes.
+# Strategy: the k_rel=40 interface DOF is x_r = u_B - u_w.  In the near-rigid
+# limit u_w ≈ 0, so x_r ≈ u_B -- the Fourier coefficients transfer directly to
+# the rigid system's Newton unknown u_B.
+#
+# We warm-start point-by-point: for each (fourier, omega) on the k_rel=40 branch
+# we fix omega and run Newton on the rigid problem from that initial guess.
+# Successful points seed a new SolutionSet; then arc-length continuation
+# explores the rest of the branch from the best-converged seed.
 
-print("\n" + "=" * 70)
-print("Rigid wall (k_rel=1000, warm-start from k_rel=40 branch)")
-print("=" * 70)
-
-K_REL_RIGID = 1000.0
-ss_40  = raw[40.0][2]          # raw solution set from k_rel=40
-sys_40 = raw[40.0][3]          # system object from k_rel=40
-
-sys_rigid  = RodVibroImpactFlexible(k_rel=K_REL_RIGID, F0=F0, poly_deg=POLY_DEG)
-prov_rigid = NumericalFRF(sys_rigid.mass_matrix,
-                          sys_rigid.damping_matrix,
-                          sys_rigid.stiffness_matrix)
-cont_rigid = DLFTContact(epsilon=EPSILON, g_zero=GAP)
-prob_rigid = FBSProblem(sys_rigid, prov_rigid, cont_rigid)
-
-solver_rigid = HarmonicBalanceMethod(
-    harmonics=HARMONICS, freq_domain_ode=prob_rigid,
-    corrector_parameterization=OrthogonalParameterization,
-    predictor=TangentPredictorBordered,
-)
-
-# Use the last solution of the 40*k_rod branch as initial guess.
-# Both systems share the same Newton unknown (relative DOF x_r = u_B - u_w),
-# so the Fourier coefficients transfer directly.
-ig_rigid = FourierOmegaPoint(ss_40.fourier[-1], ss_40.omega[-1])
-rd_rigid = FourierOmegaPoint.new_from_first_harmonic(
-    np.zeros((1, 1), complex), omega=1.0)
-
-step_kwargs_rigid = {
-    "base":                      2.0,
-    "initial_step_length":       0.001,
-    "maximum_step_length":       0.003,
-    "minimum_step_length":       1e-7,
-    "goal_number_of_iterations": 3,
-}
-
-t0 = time()
-ss_rigid = solver_rigid.solve_and_continue(
-    initial_guess                 = ig_rigid,
-    initial_reference_direction   = rd_rigid,
-    maximum_number_of_solutions   = 5000,
-    angular_frequency_range       = [OMEGA_START, OMEGA_END],
-    solver_kwargs                 = solver_kwargs,
-    step_length_adaptation_kwargs = step_kwargs_rigid,
-    jacobian_update_frequency     = 1,
-)
-
-omega_hat_r  = np.array(ss_rigid.omega)
-omega_phys_r = omega_hat_r * OMEGA_1
-peak_r = np.zeros_like(omega_phys_r)
-for i, (four, o_hat) in enumerate(zip(ss_rigid.fourier, omega_hat_r)):
-    full = prob_rigid.compute_full_response(four, o_hat)
-    Fourier_Real.compute_time_series(full)
-    peak_r[i] = float(np.max(np.abs(full.time_series[:, sys_rigid.rod_tip_idx, 0])))
-
-print(f"-> {len(omega_phys_r)} points, omega in "
-      f"[{omega_phys_r.min():.1f}, {omega_phys_r.max():.1f}] rad/s, "
-      f"peak/1e-4 in [{peak_r.min()/1e-4:.2f}, {peak_r.max()/1e-4:.2f}], {time()-t0:.1f} s")
-
+# print("\n" + "=" * 70)
+# print("Rigid wall DLFT -- warm-start (point-by-point) from k_rel=40 branch")
+# print("=" * 70)
+#
+# ss_40 = raw[40.0][2]          # SolutionSet from the k_rel=40 run
+#
+# sys_rig  = RodVibroImpactRigid(F0=F0, poly_deg=POLY_DEG)
+# prov_rig = NumericalFRF(sys_rig.mass_matrix,
+#                         sys_rig.damping_matrix,
+#                         sys_rig.stiffness_matrix)
+# # Rigid-wall DLFT: epsilon needs to dominate the rod's dynamic stiffness.
+# # Use the same scale as the flexible runs.
+# EPSILON_RIG = EPSILON
+# cont_rig  = DLFTContact(epsilon=EPSILON_RIG, g_zero=GAP)
+# prob_rig  = FBSProblem(sys_rig, prov_rig, cont_rig)
+# solver_rig = HarmonicBalanceMethod(
+#     harmonics=HARMONICS, freq_domain_ode=prob_rig,
+#     corrector_parameterization=OrthogonalParameterization,
+#     predictor=TangentPredictorBordered,
+# )
+#
+# warm_kwargs = {
+#     "maximum_iterations":             500,
+#     "absolute_tolerance":             1e-6,
+#     "jacobian_update_frequency":      1,
+#     "jacobian_reuse_delta_threshold": 1e-3,
+# }
+#
+# t0 = time()
+# warm_fouriers, warm_omegas, warm_iters = [], [], []
+# n_fail = 0
+# for four_40, om_40 in zip(ss_40.fourier, ss_40.omega):
+#     # The k_rel=40 Fourier object has one interface DOF (x_r = u_B - u_w).
+#     # In the near-rigid limit u_w ≈ 0, so x_r ≈ u_B -- coefficients transfer directly.
+#     ig_pt = FourierOmegaPoint(four_40, om_40)
+#     sol, iters, ok, _ = solver_rig.solve_fixed_frequency(ig_pt, **warm_kwargs)
+#     if ok:
+#         warm_fouriers.append(sol.fourier)
+#         warm_omegas.append(sol.omega)
+#         warm_iters.append(iters)
+#     else:
+#         n_fail += 1
+#
+# print(f"  warm-start: {len(warm_fouriers)} converged, {n_fail} failed "
+#       f"({time()-t0:.1f} s)")
+#
+# # The warm-started points follow the k_rel=40 arc-length path order -- they already
+# # trace the rigid branch through the fold correctly.  Post-process them directly;
+# # no additional continuation is needed.
+# if not warm_fouriers:
+#     print("  WARNING: no warm-start points converged -- skipping rigid branch.")
+#     omega_phys_r, peak_r = np.array([]), np.array([])
+# else:
+#     t0 = time()
+#     omega_phys_r = np.array(warm_omegas) * OMEGA_1
+#     peak_r       = np.zeros(len(warm_fouriers))
+#     for i, (four, o_hat) in enumerate(zip(warm_fouriers, warm_omegas)):
+#         full = prob_rig.compute_full_response(four, o_hat)
+#         Fourier_Real.compute_time_series(full)
+#         peak_r[i] = float(np.max(np.abs(full.time_series[:, sys_rig.rod_tip_idx, 0])))
+#     print(f"  -> {len(omega_phys_r)} points, omega in "
+#           f"[{omega_phys_r.min():.1f}, {omega_phys_r.max():.1f}] rad/s, "
+#           f"peak/1e-4 in [{peak_r.min()/1e-4:.2f}, {peak_r.max()/1e-4:.2f}], "
+#           f"post-proc {time()-t0:.1f} s")
+#
 
 # ============================ plot: rigid vs flexible comparison =============
 
-fig2, ax2 = plt.subplots(figsize=(9.0, 4.5))
+fig2, ax2 = plt.subplots(figsize=(10.0, 5.0))
+ax2.plot(om_lin, peak_lin / SCALE, ':',  color="k",   lw=1.0,
+         label="Linear FRF (no contact)")
+ax2.axhline(GAP / SCALE,                 color="red",  ls="--", lw=1.2,
+            label=r"Contact threshold $g_0$")
 
-ax2.plot(om_lin, peak_lin / SCALE, ':',  color="k", lw=1.0, label="linear FRF")
-ax2.axhline(GAP / SCALE,                  color="red", ls="--", lw=1.2, label="$g_0$")
-
-# flexible branches (faded orange, labeled by k_rel)
+# flexible branches — pyhbm DLFT-FBS (2-substructure: rod + grounded spring)
 colors_fl = ["#FACC8E", "#F0A046", "#E8820C", "#C05800"]
-for (kv, col) in zip(K_REL_VALUES, colors_fl):
+for kv, col in zip(K_REL_VALUES, colors_fl):
     om_k, pk_k = results[kv]
     ax2.plot(om_k, pk_k / SCALE, '-', color=col, lw=1.4,
-             label=f"flexible $k_\\mathrm{{obs}}={kv:g}k_\\mathrm{{rod}}$")
+             label=rf"pyhbm DLFT-FBS  $k_\mathrm{{obs}}={kv:g}\,k_\mathrm{{rod}}$ (flexible)")
 
-# rigid branch (thick blue)
-ax2.plot(omega_phys_r, peak_r / SCALE, '-', color="#1F77B4", lw=2.4,
-         label=f"near-rigid ($k_\\mathrm{{obs}}={K_REL_RIGID:.0f}k_\\mathrm{{rod}}$)")
+# exact rigid branch — pyhbm DLFT, no obstacle DOF, warm-started from k_rel=40
+if len(omega_phys_r):
+    ax2.plot(omega_phys_r, peak_r / SCALE, '-', color="#1F77B4", lw=2.4,
+             label="pyhbm DLFT  rigid wall (exact, warm-started from $40k_\\mathrm{rod}$)")
 
 ax2.set_xlim(*XLIM); ax2.set_ylim(*YLIM)
 ax2.set_xlabel(r"$\omega$  [rad$\cdot$s$^{-1}$]")
 ax2.set_ylabel(r"$\|x(t)\|_\infty$  [$\times 10^{-4}$ m]")
-ax2.set_title("Flexible → rigid obstacle: stiffness sweep + warm-started rigid branch")
-ax2.legend(loc="upper right", fontsize=8, framealpha=0.9, ncol=2)
+ax2.set_title(
+    "Flexible obstacle stiffness sweep → rigid wall limit\n"
+    r"Colored lines: pyhbm DLFT-FBS (2-substructure, rod + grounded spring, Python)  "
+    r"Blue line: exact rigid DLFT (rod only, warm-started from $k_\mathrm{obs}=40\,k_\mathrm{rod}$)",
+    fontsize=9)
+ax2.legend(loc="upper right", fontsize=8, framealpha=0.9, ncol=1)
 ax2.grid(True, alpha=0.25)
 fig2.tight_layout()
 

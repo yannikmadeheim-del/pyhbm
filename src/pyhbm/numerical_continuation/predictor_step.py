@@ -40,7 +40,7 @@ class TangentPredictorRobust(Predictor):
         # align predictor_vector with reference
         predictor_vector *= sign(vdot(reference_direction, predictor_vector))
         # scale to match step length
-        return predictor_vector
+        return predictor_vector * step_length
     
     @staticmethod
     def filter_directions(predictor_vector: np.ndarray, 
