@@ -37,7 +37,7 @@ class SDOFVibroImpact(FBS_System):
     """
     is_real_valued = True
 
-    def __init__(self, m=1.0, c=0.01, k=1.0, F0=0.02, poly_deg=100, k_rel=100):
+    def __init__(self, m=1.0, c=0.01, k=1.0, F0=0.02, poly_deg=100, k_rel=30):
         self.mass_matrix       = np.array([[m, 0],[0, 0]])
         self.damping_matrix    = np.array([[c, 0],[0, 0]])
         self.stiffness_matrix  = np.array([[k, 0],[0, k_rel*k]])
@@ -55,7 +55,6 @@ class SDOFVibroImpact(FBS_System):
     # DLFT computes contact internally; stubs kept so AFT could be plugged in.
     def interface_force(self, u_rel, udot_rel, tau):
         return np.zeros((len(tau), self.dimension, 1))
-
     def jacobian_interface_force(self, u_rel, udot_rel, tau):
         return np.zeros((len(tau), self.dimension, self.dimension))
 
@@ -239,62 +238,6 @@ if len(solution_set.omega) > MAX_POINTS_BETWEEN_PHASES:
     print(f"  subsampled {len(om_now)} -> {len(sub.omega)} points for warm-start")
     solution_set = sub
 
-# --- Phase 2: warm-start refinement at each subsequent ε --------------------
-fixed_newton_kwargs = {
-    "maximum_iterations":             300,
-    "absolute_tolerance":             1e-6,
-    "jacobian_update_frequency":      1,
-    "jacobian_reuse_delta_threshold": 1e-3,
-}
-
-for k_rel in k_rel_shedule:
-    print(f"\nPhase 2: warm-start at ε = {eps:.1e}")
-    contact = DLFTContact(epsilon=EPSILON, g_zero=GAP, k_rel=k_rel)
-    problem = FBSProblem(system, provider, contact)
-    solver  = HarmonicBalanceMethod(harmonics=HARMONICS, freq_domain_ode=problem)
-
-    refined_fouriers, refined_omegas, refined_iters = [], [], []
-    failures = 0
-
-    for four_prev, om_prev in zip(solution_set.fourier, solution_set.omega):
-        x_init = FourierOmegaPoint(four_prev, om_prev)
-        sol, iters, success, _ = solver.solve_fixed_frequency(
-            x_init, **fixed_newton_kwargs
-        )
-        if success:
-            refined_fouriers.append(sol.fourier)
-            refined_omegas.append(sol.omega)
-            refined_iters.append(iters)
-        else:
-            failures += 1
-
-    if not refined_fouriers:
-        print(f"  ALL {failures} points failed at k_obs = {k_rel:.1e}*k_ref; "
-              f"stopping sweep. Keeping previous FRC.")
-        break
-
-    # Rebuild the SolutionSet from the refined points
-    new_set = SolutionSet(
-        FourierOmegaPoint(refined_fouriers[0], refined_omegas[0]),
-        refined_iters[0], 0.0,
-    )
-    for f, om, it in zip(refined_fouriers[1:],
-                         refined_omegas[1:],
-                         refined_iters[1:]):
-        new_set.append(FourierOmegaPoint(f, om), it, 0.0)
-    solution_set = new_set
-
-    om_now = np.array(solution_set.omega)
-    print(f"  -> kept {len(refined_fouriers)} "
-          f"({failures} failures), "
-          f"ω range [{om_now.min():.4f}, {om_now.max():.4f}]")
-
-EPSILON_FINAL = problem.method.epsilon
-print(f"\nFinal solution set at ε = {EPSILON_FINAL:.1e}: "
-      f"{len(solution_set.omega)} points")
-print(f"Total ε-sweep time: {time() - t0:.2f} s")
-
-
 # ============================ diagnostics (always run) =====================
 
 omegas_arr = np.array(solution_set.omega)
@@ -361,7 +304,7 @@ ax.plot(omegas, Apeak, '--', color="C2", lw=1.4, label="pyhbm DLFT -- peak |q(t)
 ax.axhline(GAP, color="k", ls=":", lw=0.8, label=f"gap $g_0$={GAP}")
 ax.set_xlabel(r"$\omega$")
 ax.set_ylabel("amplitude")
-ax.set_title(f"SDOF vibro-impact -- DLFT (ε={EPSILON_FINAL:.0e}, ε-sweep) vs NLvib shooting")
+ax.set_title(f"SDOF vibro-impact -- DLFT (ε={EPSILON:.0e}, ε-sweep) vs NLvib shooting")
 ax.legend(loc="upper left", fontsize=9)
 ax.grid(True, alpha=0.4)
 plt.tight_layout()

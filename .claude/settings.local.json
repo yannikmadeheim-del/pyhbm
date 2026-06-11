@@ -5,7 +5,8 @@
       "Bash(python:*)",
       "Bash(cp:*)",
       "Bash(ls \"C:/Users/yanni/Desktop/TUM/Bachelorarbeit/Fast_numerical_solution_for_nonlinear_FE_dynamics/Literatur/\" 2>&1 | head -50)",
-      "Bash(cd \"C:\\\\Users\\\\yanni\\\\Desktop\\\\TUM\\\\Bachelorarbeit\\\\Fast_numerical_solution_for_nonlinear_FE_dynamics\\\\Literatur\" && python -c \" *)"
+      "Bash(cd \"C:\\\\Users\\\\yanni\\\\Desktop\\\\TUM\\\\Bachelorarbeit\\\\Fast_numerical_solution_for_nonlinear_FE_dynamics\\\\Literatur\" && python -c \" *)",
+      "mcp__visualize__read_me"
     ]
   }
 }
