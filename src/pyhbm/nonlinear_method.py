@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 from .frequency_domain import (
     Fourier, Fourier_Real, FourierOmegaPoint,
-    JacobianFourier_Real,
+    JacobianFourier_Real, block_diag_stack_to_RI,
 )
 
 
@@ -76,7 +76,7 @@ class AFT(NonlinearMethod):
 
     def compute_F_int(self, x: FourierOmegaPoint, ode) -> np.ndarray:
         fnl = self._get_nonlinear_term(x, ode)
-        return vstack(fnl.coefficients)
+        return fnl.coefficients.reshape(-1, 1)   # (Nh, d, 1) -> (Nh*d, 1) view
 
     def compute_J_int_RI(self, x: FourierOmegaPoint, ode) -> np.ndarray:
         Jnl = self._get_jacobian_nonlinear_term(x, ode)
@@ -85,9 +85,9 @@ class AFT(NonlinearMethod):
     def compute_dF_int_domega_RI(self, x: FourierOmegaPoint, ode) -> np.ndarray:
         qdot_adim = x.fourier.get_adimensional_time_derivative()
         Gdot   = self._get_Gdot(x, ode)
-        qdot_R = vstack(qdot_adim.real)
-        qdot_I = vstack(qdot_adim.imag)
-        return vstack((
+        qdot_R = qdot_adim.real.reshape(-1, 1)
+        qdot_I = qdot_adim.imag.reshape(-1, 1)
+        return np.concatenate((
             Gdot.RR @ qdot_R + Gdot.RI @ qdot_I,
             Gdot.IR @ qdot_R + Gdot.II @ qdot_I,
         ))
@@ -101,7 +101,7 @@ class DLFTContact(NonlinearMethod):
     Correction:  λ   = max(0, λ_p)
     Force:       λ̃   = DFT[λ]
 
-    Bound to an FBSProblem at construction; reads B_fourier, F_ext_full,
+    Bound to an FBSProblem at construction; reads B, F_ext, the per-harmonic
     admittance caches, and the FRF provider through that reference.
     """
 
@@ -116,26 +116,23 @@ class DLFTContact(NonlinearMethod):
     # --- internal helpers (use self._problem) ---
 
     def _get_Yr(self, x):
-        if x.Yr_cache is None:
-            x.Yr_cache = self._problem._get_BY(x) @ self._problem.B_fourier.T
-        return x.Yr_cache
+        return self._problem._get_Yr(x)         # (Nh, n_int, n_int) stack, cached on x
 
     def _get_Fext_admr(self, x):
-        return self._problem._get_BY(x) @ self._problem.F_ext_full
+        return self._problem._get_Fadm(x)       # (Nh, n_int, 1) stack, cached on x
 
     def _get_Zr_rhs(self, x):
+        # z = Y_r^{-1} (F_adm - x_r), solved harmonic-by-harmonic (batched)
         if x.Zr_rhs is None:
-            Yr        = self._get_Yr(x)
-            Fext_admr = self._get_Fext_admr(x)
-            x.Zr_rhs  = np.linalg.solve(Yr, Fext_admr - vstack(x.fourier.coefficients))
+            x.Zr_rhs = np.linalg.solve(self._get_Yr(x),
+                                       self._get_Fext_admr(x) - x.fourier.coefficients)
         return x.Zr_rhs
 
     def _get_lambda_corrected(self, x):
         if x.lambda_corrected is None:
-            n_int = self._problem.ode.dimension
-            zr_fourier = Fourier(
-                self._get_Zr_rhs(x).reshape(Fourier.number_of_harmonics, n_int, 1)
-            )
+            # z_r = Y_r^{-1} (F_adm - x_r): the contact force the linear coupled
+            # system would need to hold the interface at x_r ("balancing" force)
+            zr_fourier = Fourier(self._get_Zr_rhs(x))   # already (Nh, n_int, 1)
             Fourier_Real.compute_time_series(zr_fourier)
             zr_t   = zr_fourier.time_series
             Fourier_Real.compute_time_series(x.fourier)
@@ -150,15 +147,8 @@ class DLFTContact(NonlinearMethod):
             # x.contact_mask = soft_mask  # was: lambda_p > 0
 
             lambda_x_corr      = Fourier_Real.new_from_time_series(lambda_t_corr)
-            x.lambda_corrected = vstack(lambda_x_corr.coefficients)
+            x.lambda_corrected = lambda_x_corr.coefficients.reshape(-1, 1)
         return x.lambda_corrected
-
-    def _invert_Yr_blockwise(self, Yr, n_int):
-        Zr = zeros_like(Yr)
-        for k in range(Fourier.number_of_harmonics):
-            s = slice(k * n_int, (k + 1) * n_int)
-            Zr[s, s] = np.linalg.solve(Yr[s, s], eye(n_int))
-        return Zr
 
     # --- NonlinearMethod interface ---
 
@@ -171,33 +161,27 @@ class DLFTContact(NonlinearMethod):
         contact_tangent = x.contact_mask * eye(n_int)    # (Nt, n_int, n_int)
         J_mask    = JacobianFourier_Real.new_from_time_series(contact_tangent)
         J_mask_RI = block([[J_mask.RR, J_mask.RI], [J_mask.IR, J_mask.II]])
-        Yr = self._get_Yr(x)
-        Zr = self._invert_Yr_blockwise(Yr, n_int)
-        complex_int_dim = Fourier.number_of_harmonics * n_int
-        M    = self.epsilon * eye(complex_int_dim) - Zr
-        M_RI = block([[M.real, -M.imag], [M.imag, M.real]])
-        return J_mask_RI @ M_RI
+        # Z_r = Y_r^{-1} per harmonic (batched) = dynamic interface stiffness;
+        # M = eps*I - Z_r, block-diagonal
+        Nh = Fourier.number_of_harmonics
+        Zr = np.linalg.solve(self._get_Yr(x),
+                             np.broadcast_to(eye(n_int), (Nh, n_int, n_int)))
+        M  = self.epsilon * eye(n_int) - Zr              # broadcasts over harmonics
+        return J_mask_RI @ block_diag_stack_to_RI(M)
 
     def compute_dF_int_domega_RI(self, x: FourierOmegaPoint, ode) -> np.ndarray:
         problem = self._problem
-        Y   = problem._get_FRF(x)
-        dY  = problem.frf_provider.compute_FRF_derivative(
-                  x.omega, Fourier.harmonics, problem.d_total, Y)
-        BdY    = problem.B_fourier @ dY
-        Yr     = self._get_Yr(x)
-        Zr_rhs = self._get_Zr_rhs(x)
-        n_int  = ode.dimension
-        dlambda_pred = np.linalg.solve(
-            Yr, BdY @ (problem.F_ext_full - problem.B_fourier.T @ Zr_rhs)
-        )
-        dlambda_pred_fourier = Fourier(
-            dlambda_pred.reshape(Fourier.number_of_harmonics, n_int, 1)
-        )
+        BdY = problem.B @ problem._get_dY(x)             # B dY/dω, (Nh, n_int, d_total)
+        # rhs = B dY/dω (F_ext - B^T z_r): how the predicted multiplier's source
+        # term shifts with ω at frozen x_r
+        rhs = BdY @ (problem.F_ext - problem.B.T @ self._get_Zr_rhs(x))
+        dlambda_pred = np.linalg.solve(self._get_Yr(x), rhs)   # dλ_p/dω, (Nh, n_int, 1)
+        dlambda_pred_fourier = Fourier(dlambda_pred)
         Fourier_Real.compute_time_series(dlambda_pred_fourier)
         dlambda_t_corr = np.where(x.contact_mask, dlambda_pred_fourier.time_series, 0.0)
         dlambda_corr   = Fourier_Real.new_from_time_series(dlambda_t_corr)
-        dlambda_v      = vstack(dlambda_corr.coefficients)
-        return vstack((dlambda_v.real, dlambda_v.imag))
+        dlambda_v      = dlambda_corr.coefficients.reshape(-1, 1)
+        return np.concatenate((dlambda_v.real, dlambda_v.imag))
 
 
 
@@ -309,19 +293,17 @@ class DLFTFriction(NonlinearMethod):
     # --- internal helpers (use self._problem) ---
 
     def _get_Yr(self, x):
-        if x.Yr_cache is None:
-            x.Yr_cache = self._problem._get_BY(x) @ self._problem.B_fourier.T
-        return x.Yr_cache
+        return self._problem._get_Yr(x)         # (Nh, n_int, n_int) stack, cached on x
 
     def _get_Fext_admr(self, x):
-        return self._problem._get_BY(x) @ self._problem.F_ext_full
+        return self._problem._get_Fadm(x)       # (Nh, n_int, 1) stack, cached on x
 
     def _get_Zr_rhs(self, x):
-        # z = solve(Y_r, F_adm - x_r) = f_r - Z_r u_r  (equilibrium contact force)
+        # z = solve(Y_r, F_adm - x_r) = f_r - Z_r u_r  (equilibrium contact force),
+        # solved harmonic-by-harmonic (batched) on the (Nh, n_int, n_int) stack
         if x.Zr_rhs is None:
-            Yr        = self._get_Yr(x)
-            Fext_admr = self._get_Fext_admr(x)
-            x.Zr_rhs  = np.linalg.solve(Yr, Fext_admr - vstack(x.fourier.coefficients))
+            x.Zr_rhs = np.linalg.solve(self._get_Yr(x),
+                                       self._get_Fext_admr(x) - x.fourier.coefficients)
         return x.Zr_rhs
 
     def _corrector_sweep(self, lambda_u):
@@ -385,9 +367,9 @@ class DLFTFriction(NonlinearMethod):
             n_int   = self._problem.ode.dimension
             eps_vec = self._get_eps_vec(n_int)
 
-            zr_fourier = Fourier(
-                self._get_Zr_rhs(x).reshape(Fourier.number_of_harmonics, n_int, 1)
-            )
+            # z_r = Y_r^{-1} (F_adm - x_r): the contact force the linear coupled
+            # system would need to hold the interface at x_r ("balancing" force)
+            zr_fourier = Fourier(self._get_Zr_rhs(x))   # already (Nh, n_int, 1)
             Fourier_Real.compute_time_series(zr_fourier)
             zr_t = zr_fourier.time_series                 # (Nt, n_int, 1)
             Fourier_Real.compute_time_series(x.fourier)
@@ -403,13 +385,6 @@ class DLFTFriction(NonlinearMethod):
             x.lambda_corrected = vstack(lambda_corr.coefficients)
         return x.lambda_corrected
 
-    def _invert_Yr_blockwise(self, Yr, n_int):
-        Zr = zeros_like(Yr)
-        for k in range(Fourier.number_of_harmonics):
-            s = slice(k * n_int, (k + 1) * n_int)
-            Zr[s, s] = np.linalg.solve(Yr[s, s], eye(n_int))
-        return Zr
-
     # --- NonlinearMethod interface ---
 
     def compute_F_int(self, x: FourierOmegaPoint, ode) -> np.ndarray:
@@ -421,34 +396,27 @@ class DLFTFriction(NonlinearMethod):
         Jloc  = x.contact_mask                           # (Nt, n_int, n_int)
         J_mask    = JacobianFourier_Real.new_from_time_series(Jloc)
         J_mask_RI = block([[J_mask.RR, J_mask.RI], [J_mask.IR, J_mask.II]])
-        Yr = self._get_Yr(x)
-        Zr = self._invert_Yr_blockwise(Yr, n_int)
-        eps_vec = self._get_eps_vec(n_int)
-        E    = diag(np.tile(eps_vec, Fourier.number_of_harmonics))   # blkdiag(eps) over harmonics
-        M    = E - Zr
-        M_RI = block([[M.real, -M.imag], [M.imag, M.real]])
-        return J_mask_RI @ M_RI
+        # Z_r = Y_r^{-1} per harmonic (batched) = dynamic interface stiffness;
+        # M = diag(eps) - Z_r, block-diagonal
+        Nh = Fourier.number_of_harmonics
+        Zr = np.linalg.solve(self._get_Yr(x),
+                             np.broadcast_to(eye(n_int), (Nh, n_int, n_int)))
+        M  = diag(self._get_eps_vec(n_int)) - Zr         # broadcasts over harmonics
+        return J_mask_RI @ block_diag_stack_to_RI(M)
 
     def compute_dF_int_domega_RI(self, x: FourierOmegaPoint, ode) -> np.ndarray:
         self._get_lambda_corrected(x)                    # ensure x.contact_mask = Jloc(t)
         problem = self._problem
-        Y   = problem._get_FRF(x)
-        dY  = problem.frf_provider.compute_FRF_derivative(
-                  x.omega, Fourier.harmonics, problem.d_total, Y)
-        BdY    = problem.B_fourier @ dY
-        Yr     = self._get_Yr(x)
-        Zr_rhs = self._get_Zr_rhs(x)
-        n_int  = ode.dimension
-        dlambda_pred = np.linalg.solve(
-            Yr, BdY @ (problem.F_ext_full - problem.B_fourier.T @ Zr_rhs)
-        )
-        dlambda_pred_fourier = Fourier(
-            dlambda_pred.reshape(Fourier.number_of_harmonics, n_int, 1)
-        )
+        BdY = problem.B @ problem._get_dY(x)             # B dY/dω, (Nh, n_int, d_total)
+        # rhs = B dY/dω (F_ext - B^T z_r): how the predicted multiplier's source
+        # term shifts with ω at frozen x_r
+        rhs = BdY @ (problem.F_ext - problem.B.T @ self._get_Zr_rhs(x))
+        dlambda_pred = np.linalg.solve(self._get_Yr(x), rhs)   # dλ_p/dω, (Nh, n_int, 1)
+        dlambda_pred_fourier = Fourier(dlambda_pred)
         Fourier_Real.compute_time_series(dlambda_pred_fourier)
         # per-sample block multiply by the cached contact tangent Jloc(t)
         Jloc = x.contact_mask                            # (Nt, n_int, n_int)
         dlambda_t_corr = einsum('kij,kjl->kil', Jloc, dlambda_pred_fourier.time_series)
         dlambda_corr   = Fourier_Real.new_from_time_series(dlambda_t_corr)
-        dlambda_v      = vstack(dlambda_corr.coefficients)
-        return vstack((dlambda_v.real, dlambda_v.imag))
+        dlambda_v      = dlambda_corr.coefficients.reshape(-1, 1)
+        return np.concatenate((dlambda_v.real, dlambda_v.imag))

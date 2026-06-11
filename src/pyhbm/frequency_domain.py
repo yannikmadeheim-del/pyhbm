@@ -75,9 +75,11 @@ class Fourier(object):
         return Fourier(coefficients = self.coefficients * other)
     
     def __array__(self):
-        R = vstack(self.coefficients.real)
-        I = vstack(self.coefficients.imag)
-        return vstack((R, I))
+        # (Nh, d, 1) -> (Nh*d, 1) is a plain C-order flatten, so reshape (a free
+        # view) replaces the per-harmonic vstack copy.
+        R = self.coefficients.real.reshape(-1, 1)
+        I = self.coefficients.imag.reshape(-1, 1)
+        return concatenate((R, I))
     
     @staticmethod
     def new_from_RI(RI: array):
@@ -87,9 +89,10 @@ class Fourier(object):
     
     @staticmethod
     def coefficients_to_RI(coeffs):
-        R = vstack(coeffs.real)
-        I = vstack(coeffs.imag)
-        return vstack((R, I))
+        # (Nh, d, 1) -> (Nh*d, 1) flatten via reshape view, then stack [Re; Im].
+        R = coeffs.real.reshape(-1, 1)
+        I = coeffs.imag.reshape(-1, 1)
+        return concatenate((R, I))
     
     @staticmethod
     def zeros(dimension: int):
@@ -143,6 +146,21 @@ class Fourier_Complex(Fourier):
 
 #%%
 
+def block_diag_stack_to_RI(blocks: array) -> array:
+    """Embed a block-diagonal complex operator, given as a (Nh, a, b) stack of
+    per-harmonic blocks, into the dense real [[Re, -Im], [Im, Re]] form used by
+    the Newton solver. Only interface-sized operators should pass through here:
+    the result is a dense (2*Nh*a, 2*Nh*b) matrix.
+    """
+    Nh, a, b = blocks.shape
+    Re = zeros((Nh * a, Nh * b))
+    Im = zeros((Nh * a, Nh * b))
+    for k in range(Nh):
+        Re[k * a:(k + 1) * a, k * b:(k + 1) * b] = blocks[k].real
+        Im[k * a:(k + 1) * a, k * b:(k + 1) * b] = blocks[k].imag
+    return block([[Re, -Im], [Im, Re]])
+
+
 class FourierOmegaPoint(object):
     def __init__(self, fourier: Fourier, omega: float):
         self.fourier: Fourier = fourier
@@ -152,12 +170,14 @@ class FourierOmegaPoint(object):
         self.second_adimensional_time_derivative = None
         self.Gdot = None
         self.Y_cache = None
+        self.dY_cache = None         # dY/dω — reused by dR/dω and DLFT dF_int/dω
         self.Z_cache = None
         self.nonlinear_term_cache = None
-        self.BY_cache = None        # B_fourier @ Y  (complex, reused by residue + Jacobian)
-        self.BYBT_RI_cache = None   # FRF_to_RI(B @ Y @ B.T)  (reused by Jacobian + dR/dω)
-        self.Yr_cache = None         # complex Y_r = B @ Y @ B^T
-        self.Zr_rhs = None           # solve(Y_r, F_adm − Q_rel)  (linear/"balancing" multiplier estimate)
+        self.BY_cache = None        # B @ Y  (FBSProblem: (Nh, n_int, d_total) stack; legacy classes: dense)
+        self.BYBT_RI_cache = None   # dense RI form of B @ Y @ B.T  (reused by Jacobian + dR/dω)
+        self.Yr_cache = None         # Y_r = B Y B^T  (FBSProblem: (Nh, n_int, n_int) stack; legacy: dense)
+        self.Fext_admr_cache = None  # F_adm = B Y f_ext  ((Nh, n_int, 1) stack) — reused by residue and Zr_rhs
+        self.Zr_rhs = None           # solve(Y_r, F_adm − Q_rel)  ((Nh, n_int, 1) stack in DLFT methods)
         self.lambda_corrected = None # corrected contact force λ̃ = DFT[max(0, λ_p)]
         self.contact_mask = None     # time-domain Boolean mask m = (λ_p > 0)
 

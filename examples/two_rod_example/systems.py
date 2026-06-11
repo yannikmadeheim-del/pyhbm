@@ -51,7 +51,7 @@ from pyhbm import FBS_System
 @dataclass
 class RodParams:
     """Clamped-free axial bar parameters (Vadcard Table 1 defaults)."""
-    n_elem: int = 10          # number of two-node bar elements (per rod)
+    n_elem: int = 100          # number of two-node bar elements (per rod)
     L:      float = 0.13      # rod length [m]
     E:      float = 210e9     # Young's modulus [Pa]
     rho:    float = 7800.0    # density [kg/m^3]

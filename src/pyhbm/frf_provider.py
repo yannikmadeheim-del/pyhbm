@@ -9,18 +9,18 @@ from .frequency_domain import Fourier, FourierOmegaPoint
 
 class FRFProvider(ABC):
     """
-    Computes the block-diagonal admittance matrix Y(omega) and its omega-derivative.
-    Y has shape (Nh*d, Nh*d) where each (d,d) diagonal block holds Y_n for harmonic n.
+    Computes the per-harmonic admittance blocks Y_n(omega) and their omega-derivatives.
+    Both are returned as a stack of shape (Nh, d, d): one (d, d) block per harmonic n.
     """
 
     @abstractmethod
     def compute_FRF(self, omega: float, harmonics, d: int) -> array:
-        """Return block-diagonal Y, shape (Nh*d, Nh*d), complex."""
+        """Return the admittance stack Y, shape (Nh, d, d), complex."""
 
     @abstractmethod
     def compute_FRF_derivative(self, omega: float, harmonics, d: int,
                                Y_cache: array) -> array:
-        """Return block-diagonal dY/domega, shape (Nh*d, Nh*d), complex."""
+        """Return the stack dY/domega, shape (Nh, d, d), complex."""
 
 
 class NumericalFRF(FRFProvider):
@@ -37,22 +37,22 @@ class NumericalFRF(FRFProvider):
         self.K = K
 
     def compute_FRF(self, omega: float, harmonics, d: int) -> array:
+        # n has shape (Nh, 1, 1) so that broadcasting against the (d, d) matrices
+        # builds the whole (Nh, d, d) stack Z_n = -(n*omega)^2 M + i n*omega C + K
+        # in one expression; the batched solve then inverts all blocks in one
+        # LAPACK call instead of a Python loop.
         Nh = len(harmonics)
-        Y = zeros((Nh * d,Nh * d), dtype=complex)
-        for k, n in enumerate(harmonics):
-            Z_n = -(n * omega) ** 2 * self.M + 1j * n * omega * self.C + self.K
-            Y[k * d:(k + 1) * d, k * d:(k + 1) * d] = np.linalg.solve(Z_n, eye(d))
-        return Y
+        n = np.asarray(harmonics, dtype=float).reshape(-1, 1, 1)
+        Z = -(n * omega) ** 2 * self.M + 1j * (n * omega) * self.C + self.K
+        return np.linalg.solve(Z, np.broadcast_to(eye(d), (Nh, d, d)))
 
     def compute_FRF_derivative(self, omega: float, harmonics, d: int,
                                Y_cache: array) -> array:
-        Nh = len(harmonics)
-        dY = zeros((Nh * d, Nh * d), dtype=complex)
-        for k, n in enumerate(harmonics):
-            Y_n = Y_cache[k * d:(k + 1) * d, k * d:(k + 1) * d]
-            dZ_n = -2 * n ** 2 * omega * self.M + 1j * n * self.C
-            dY[k * d:(k + 1) * d, k * d:(k + 1) * d] = -Y_n @ dZ_n @ Y_n
-        return dY
+        # dY_n = -Y_n dZ_n Y_n for all harmonics with one batched matmul;
+        # Y_cache is the (Nh, d, d) stack returned by compute_FRF.
+        n = np.asarray(harmonics, dtype=float).reshape(-1, 1, 1)
+        dZ = -2.0 * n ** 2 * omega * self.M + 1j * n * self.C
+        return -Y_cache @ dZ @ Y_cache
 
 
 class ExperimentalFRF(FRFProvider):
@@ -99,13 +99,8 @@ class ExperimentalFRF(FRFProvider):
         return result
 
     def compute_FRF(self, omega: float, harmonics, d: int) -> array:
-        Nh = len(harmonics)
         omega_harmonics = harmonics * omega          # shape (Nh,)
-        Y_blocks = self.interpolate(omega_harmonics) # shape (Nh, d, d)
-        Y = zeros((Nh * d, Nh * d), dtype=complex)
-        for k in range(Nh):
-            Y[k * d:(k + 1) * d, k * d:(k + 1) * d] = Y_blocks[k]
-        return Y
+        return self.interpolate(omega_harmonics)     # stack, shape (Nh, d, d)
 
     def compute_FRF_derivative(self, omega: float, harmonics, d: int,
                                Y_cache: array) -> array:
