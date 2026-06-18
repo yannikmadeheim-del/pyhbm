@@ -15,6 +15,8 @@ Run:  python make_reference.py
 """
 import _setup  # noqa: F401
 
+from pathlib import Path
+
 import numpy as np
 
 from pyhbm import DLFTContact
@@ -67,10 +69,13 @@ def make_one(lb_rel):
     data = np.column_stack(cols)
     header = ",".join(header_parts)
 
-    out = reference_path(lb_rel)
+    # Written NEXT TO this script, NOT into reference_csv/: a CSV only becomes
+    # the comparison reference once YOU copy it there manually.
+    out = Path(__file__).parent / reference_path(lb_rel).name
     np.savetxt(out, data, delimiter=",", header=header, comments="")
     print(f"  -> {len(res.omega_phys)} points, coverage {res.coverage:.0%}, "
           f"saved: {out.name}")
+    print(f"     copy it manually into reference_csv/ to use it as reference")
 
 
 def main():

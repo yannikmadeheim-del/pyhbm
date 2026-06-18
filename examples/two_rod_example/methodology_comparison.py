@@ -172,14 +172,29 @@ def main():
     peak_lin = np.array([abs(linear_relative(ref_sys, w)) for w in wh])
     om_lin = wh * ref_sys.omega_ref
 
+    # x-window follows the swept range from config, not plotting.py's default
+    xlim = tuple(sorted((cfg.OMEGA_START * ref_sys.omega_ref, cfg.OMEGA_END * ref_sys.omega_ref)))
+
     here = Path(__file__).parent
     for sig in SIGNALS:
         plotting.plot_frc_overview(
             results, here / f"two_rod_method_comparison_frc_{sig}.png",
             signal=sig, om_lin=om_lin, peak_lin=peak_lin, gap=cfg.GAP,
-            reference=ref_curves)
+            reference=ref_curves, xlim=xlim)
     plotting.plot_metrics(results, here / "two_rod_method_comparison_metrics.png",
                           signal="tipA")
+
+    # optional: uncoupled linear FRF entry (clean + noisy per finite SNR in the
+    # noise sweep) -- see the PLOT_FRF / FRF_ENTRY section in config.py.
+    if getattr(cfg, "PLOT_FRF", False):
+        frf_sys = TwoRodVibroImpact(cfg.PARAMS,
+                                    cfg.params_B_for(cfg.BASELINE["LB_rel"]))
+        plotting.plot_uncoupled_frf(
+            frf_sys, cfg.FRF_ENTRY, here / "two_rod_uncoupled_frf.png",
+            harmonics=cfg.HARMONICS, omega_range=OMEGA_RANGE,
+            density_per_hz=cfg.BASELINE["density"],
+            noise_levels=cfg.SWEEPS.get("noise", []),
+            noise_seed=cfg.NOISE_SEED)
 
     import matplotlib.pyplot as plt
     plt.show()

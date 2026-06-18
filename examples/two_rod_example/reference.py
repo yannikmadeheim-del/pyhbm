@@ -48,6 +48,8 @@ from pathlib import Path
 import numpy as np
 
 _DIR = Path(__file__).resolve().parent
+REF_DIR = _DIR / "reference_csv"            # all reference/shooting CSVs live here
+REF_DIR.mkdir(exist_ok=True)
 
 SIGNALS = ("tipA", "xr")
 
@@ -129,7 +131,7 @@ def reference_path(lb_rel: float = 1.0) -> Path:
     a different system, hence its own ground truth) -- mirrors the per-k_rel
     naming of the single-rod example.
     """
-    return _DIR / f"reference_two_rod_dlft_numerical_LB_{lb_rel:g}_LA.csv"
+    return REF_DIR / f"reference_two_rod_dlft_numerical_LB_{lb_rel:g}_LA.csv"
 
 
 def load_reference_csv(path) -> ReferenceCurve:

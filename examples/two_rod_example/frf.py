@@ -22,7 +22,6 @@ Delta f = 1 / density_per_hz  [Hz].
 """
 import numpy as np
 from numpy import eye, zeros
-from numpy.fft import rfft, irfft
 
 from pyhbm import NumericalFRF, ExperimentalFRF
 
@@ -50,19 +49,21 @@ def sample_admittance(system, omega_grid):
 
 
 def add_measurement_noise(omega_grid, Y, snr_db, rng=None):
-    """Inject measurement noise by round-tripping each admittance channel
-    through the time domain.
+    """Inject measurement noise the pyFBS way (pyfbs.mck.MCK.add_noise):
 
-    ``omega_grid = linspace(0, omega_max, n_freq)`` is exactly the one-sided
-    (rfft) half-spectrum of a REAL impulse response, so for each (i, j) channel
-    ``y_t = irfft(Y[:, i, j])`` is a real time signal.  Gaussian noise scaled to
-    the per-channel signal RMS by the requested SNR is added in the TIME domain
-    and transformed back with rfft.  Doing it this way (rather than perturbing
-    the complex FRF directly) preserves the conjugate symmetry Y(-w)=conj(Y(w)),
-    so the result is still a physically realizable FRF, and yields a noise floor
-    with realistic spectral structure instead of a flat complex jitter.
+        noise   = |Y| * (n1*randn + 1j*n2*randn)  +  (n3*randn + 1j*n4*randn)
+        Y_noisy = Y + noise                        (per frequency bin, per channel)
 
-    :param omega_grid: (n_freq,) nondimensional grid, used only for its length.
+    The single SNR knob maps onto pyFBS's four coefficients as
+
+        s  = 10^(-snr_db/20)
+        n1 = n2 = s                      (proportional, dimensionless)
+        n3 = n4 = s * median|Y_ij|       (additive floor, per channel scale)
+
+    so e.g. 40 dB -> 1% proportional jitter + a floor at 1% of the channel's
+    median magnitude.
+
+    :param omega_grid: (n_freq,) nondimensional grid (unused, kept for signature).
     :param Y:          (n_freq, d, d) complex admittance blocks.
     :param snr_db:     signal-to-noise ratio in dB; np.inf -> Y returned unchanged.
     :param rng:        optional numpy Generator for reproducible noise.
@@ -72,17 +73,15 @@ def add_measurement_noise(omega_grid, Y, snr_db, rng=None):
         return Y
     rng = np.random.default_rng() if rng is None else rng
     n_freq, d, _ = Y.shape
-    n_time = 2 * (n_freq - 1)               # rfft length that produces n_freq bins
-    noise_scale = 10.0 ** (-snr_db / 20.0)  # std(noise) / RMS(signal)
+    s = 10.0 ** (-snr_db / 20.0)
     Y_noisy = Y.copy()
-    for i in range(d):
-        for j in range(d):
-            y_t = irfft(Y[:, i, j], n=n_time)
-            rms = np.sqrt(np.mean(y_t ** 2))
-            if rms == 0.0:
-                continue
-            y_t = y_t + rng.normal(0.0, noise_scale * rms, size=n_time)
-            Y_noisy[:, i, j] = rfft(y_t, n=n_time)
+    for i in range(d):                      # per channel: bounds peak memory on
+        for j in range(d):                  # the long experimental grids
+            y_abs = np.abs(Y[:, i, j])
+            floor = np.median(y_abs)        # channel magnitude scale (n3 = n4)
+            g = rng.standard_normal((n_freq, 4))
+            Y_noisy[:, i, j] += (y_abs * (s * g[:, 0] + 1j * s * g[:, 1])
+                                 + floor * (s * g[:, 2] + 1j * s * g[:, 3]))
     return Y_noisy
 
 

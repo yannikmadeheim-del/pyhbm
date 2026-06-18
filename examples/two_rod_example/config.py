@@ -25,7 +25,7 @@ from systems import RodParams
 
 # ============================ physics / discretization ======================
 
-PARAMS = RodParams(F0=25e3, poly_deg=20)   # rod A: Vadcard Table 1 + forcing at tip A
+PARAMS = RodParams(F0=25e3, poly_deg=30)   # rod A: Vadcard Table 1 + forcing at tip A
 
 
 def params_B_for(lb_rel: float) -> RodParams:
@@ -41,14 +41,14 @@ HARMONICS  = list(range(0, 21))             # 0..20  -> H = 20
 
 # Frequency sweep in nondimensional omega_hat = omega / omega_1 (omega_1 = first
 # axial mode of ONE rod; both rods are identical).
-OMEGA_START = 1.20
-OMEGA_END   = 0.90
+OMEGA_START = 1.2
+OMEGA_END   = 0.9
 
 # DLFT penalty (stiffness units): large vs the interface dynamic stiffness ~k_rod.
 # Converged solution is epsilon-INDEPENDENT (Vadcard 2022): epsilon only affects
 # Newton convergence, not the answer.  Hence it is a FIXED setting here, not a
 # comparison axis.
-EPSILON_REL = 1.0                          # epsilon = EPSILON_REL * k_rod
+EPSILON_REL = 2                        # epsilon = EPSILON_REL * k_rod
 
 
 # ============================ solver / continuation =========================
@@ -58,10 +58,10 @@ STEP_KWARGS = {
     "base":                      4.0,
     "initial_step_length":       0.002,
     "maximum_step_length":       0.005,     # narrow omega_hat window -> small steps
-    "minimum_step_length":       1e-7,
+    "minimum_step_length":       1e-8,
     "goal_number_of_iterations": 3,
 }
-MAX_SOLUTIONS = 5000
+MAX_SOLUTIONS = 1000
 
 
 # ============================ reference (ground truth) ======================
@@ -83,7 +83,7 @@ REFERENCE_STEP_KWARGS = {
     "minimum_step_length":       1e-7,
     "goal_number_of_iterations": 3,
 }
-REFERENCE_MAX_SOLUTIONS = 20000             # enough to fully trace the branch
+REFERENCE_MAX_SOLUTIONS = 10000             # enough to fully trace the branch
 
 
 # ============================ comparison switchboard ========================
@@ -92,10 +92,10 @@ REFERENCE_MAX_SOLUTIONS = 20000             # enough to fully trace the branch
 
 # Which (method, FRF source) combinations to run at all:
 RUN = {
-    "dlft_numerical":    False,
-    "dlft_experimental": False,
+    "dlft_numerical":    True,
+    "dlft_experimental": True,
     "aft_numerical":     True,
-    "aft_experimental":  False,
+    "aft_experimental":  True,
 }
 
 # Parameter sweeps (one-axis-at-a-time around BASELINE).  A single-element list =
@@ -106,21 +106,37 @@ RUN = {
 #   k_rel  -> AFT only (penalty stiffness k_c / k_rod; DLFT is penalty-free)
 #   alpha  -> AFT only (np.inf = WITHOUT regularization, finite = WITH)
 SWEEPS = {
-    "LB_rel":  [1/4],                       # e.g. [0.5, 1.0, 2.0] to vary rod-B stiffness
-    "k_rel":   [100],
-    "alpha":   [2e07, 3e07],              # with regularization vs without
-    "density": [1.0],                       # experimental FRF density [samples/Hz]
-    "noise":   [np.inf],                    # measured-FRF SNR [dB]; inf = clean
+    "LB_rel":  [1/20],                       # e.g. [0.5, 1.0, 2.0] to vary rod-B stiffness
+    "k_rel":   [],
+    "alpha":   [1e08, 1e07],              # with regularization vs without (np.inf)
+    "density": [],                       # experimental FRF density [samples/Hz]
+    "noise":   [40],                    # measured-FRF SNR [dB]; inf = clean
 }
 
 # Baseline values used for any axis NOT being swept in a given run.
 BASELINE = {
-    "LB_rel":  1/4,
+    "LB_rel":  1/20,
     "k_rel":   100,
-    "alpha":   1e07,
-    "density": 1.0,
-    "noise":   np.inf,
+    "alpha":   1e08,
+    "density": 0.01,
+    "noise":   40,
 }
 
 # Seed for the experimental-FRF measurement noise (reproducible branches).
 NOISE_SEED = 1
+
+
+# ============================ uncoupled-FRF quicklook =======================
+# True -> methodology_comparison.py ALSO plots one entry of the UNCOUPLED linear
+# admittance |Y_ij(omega)| (block-diagonal system: no contact, rods uncoupled),
+# sampled on the experimental grid (BASELINE density).  If SWEEPS["noise"]
+# contains finite SNRs, the noisy FRF the solver would see is overlaid per level
+# (same noise model and seed as the experimental provider).
+#
+# FRF_ENTRY uses 1-BASED DOF numbering:
+#   1 .. n_elem            = rod A   (n_elem   = tip A)
+#   n_elem+1 .. 2*n_elem   = rod B   (2*n_elem = tip B)
+# e.g. (10, 10) = tip-A drive point (n_elem = 10);
+#      (10, 11) = tip A -> rod B    (identically ZERO: rods are uncoupled).
+PLOT_FRF  = True
+FRF_ENTRY = (10, 10)

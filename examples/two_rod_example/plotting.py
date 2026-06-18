@@ -173,6 +173,74 @@ def plot_frc_overview(results, out_path, *, signal="tipA", om_lin=None,
     print(f"Figure saved: {out_path}")
 
 
+# ============================ uncoupled linear FRF =========================
+
+def plot_uncoupled_frf(system, entry_1based, out_path, *, harmonics,
+                       omega_range, density_per_hz, noise_levels=(),
+                       noise_seed=None, margin=1.05):
+    """Plot one entry |Y_ij(omega)| of the UNCOUPLED linear admittance.
+
+    The system is block-diagonal (open gap, no contact), so entries inside rod A
+    or rod B are the substructure FRFs and any cross entry (rod A <-> rod B,
+    e.g. tip A -> rod B) is identically zero.  ``entry_1based`` uses 1-based DOF
+    numbering: 1..n_elem = rod A (n_elem = tip A), n_elem+1..2*n_elem = rod B.
+
+    The grid mirrors :func:`frf.make_experimental_provider` (``density_per_hz``
+    samples/Hz up to the top queried harmonic frequency), and for every FINITE
+    SNR in ``noise_levels`` the same time-domain noise model (and seed) used by
+    the experimental branches is overlaid -- so the plot shows exactly the FRF
+    data the solver works with.
+    """
+    from frf import sample_admittance, add_measurement_noise
+
+    i, j = entry_1based[0] - 1, entry_1based[1] - 1
+    h_max = int(np.max(harmonics))
+    omega_hi      = max(abs(omega_range[0]), abs(omega_range[1]))
+    omega_max_hat = h_max * omega_hi * margin
+    f_max  = omega_max_hat * system.omega_ref / (2.0 * np.pi)
+    n_freq = max(2, int(round(density_per_hz * f_max)) + 1)
+    omega_grid = np.linspace(0.0, omega_max_hat, n_freq)
+
+    # Y from the nondimensional matrices at omega_hat equals the physical
+    # admittance at omega = omega_hat * omega_ref (units m/N either way).
+    Y = sample_admittance(system, omega_grid)
+    om_phys = omega_grid * system.omega_ref
+
+    fig, ax = plt.subplots(figsize=(10.0, 5.0))
+    lo = min(abs(omega_range[0]), abs(omega_range[1])) * system.omega_ref
+    ax.axvspan(lo, omega_hi * system.omega_ref, color="0.88", zorder=0,
+               label="continuation window")
+
+    for snr in noise_levels:
+        if not np.isfinite(snr):
+            continue
+        Yn = add_measurement_noise(omega_grid, Y, snr,
+                                   rng=np.random.default_rng(noise_seed))
+        ax.plot(om_phys, np.abs(Yn[:, i, j]), lw=0.6, alpha=0.8,
+                label=f"noisy (SNR = {snr:g} dB)")
+    y_clean = np.abs(Y[:, i, j])
+    ax.plot(om_phys, y_clean, 'k-', lw=1.3, label="clean")
+
+    if np.any(y_clean > 0.0):
+        ax.set_yscale("log")
+    else:
+        ax.text(0.5, 0.55, "identically zero:\nrods are uncoupled (no contact)",
+                transform=ax.transAxes, ha="center", va="center", fontsize=11,
+                bbox=dict(boxstyle="round", fc="white", ec="0.6"))
+
+    n = getattr(system, "rod_tip_idx", 0) + 1            # n_elem (1-based tip A)
+    ax.set_xlabel(r"$\omega$ [rad/s]")
+    ax.set_ylabel(rf"$|Y_{{{entry_1based[0]},{entry_1based[1]}}}(\omega)|$  [m/N]")
+    ax.set_title(f"Uncoupled linear admittance, entry ({entry_1based[0]}, "
+                 f"{entry_1based[1]})   [tip A = DOF {n}, tip B = DOF {2*n}]",
+                 fontsize=10)
+    ax.grid(True, alpha=0.25)
+    ax.legend(fontsize=8, loc="upper right")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=140)
+    print(f"Figure saved: {out_path}")
+
+
 # ============================ metrics bars =================================
 
 def plot_metrics(results, out_path, *, signal="tipA"):
