@@ -13,10 +13,10 @@ Work split:
   WP1 (Ansys export)            -- implemented (Claude)
   WP2 (interface node sets)     -- implemented (Claude); node lists exported
                                    from Ansys Mechanical named selections
-  WP3 (RBE2)                    -- stub, Yannik
-  WP4 (Craig-Bampton)           -- stub, Yannik
-  WP5 (damping/assembly/checks) -- Claude, after WP3-4 review
-  WP6 (pyhbm system + HBM)      -- Claude, after WP3-4 review
+  WP3 (RBE2)                    -- implemented (Yannik, reviewed)
+  WP4 (Craig-Bampton)           -- implemented (Yannik + Claude)
+  WP5 (recovery/assembly/checks)-- Claude
+  WP6 (pyhbm system + HBM)      -- Claude
 
 Every stub's docstring contains the exact math, shapes and the acceptance check
 it must pass. All positions are in metres, global Ansys coordinate system.
@@ -159,7 +159,7 @@ def natural_frequencies(K, M, n=12):
 
 
 # ===========================================================================
-# WP2 -- interface node sets (boundary partition)          (stubs -- Yannik)
+# WP2 -- interface node sets (boundary partition)
 # ===========================================================================
 
 def read_vp_definition(csv_path, grouping=None):
@@ -310,7 +310,7 @@ def report_interface(name, nodes, idx, vp_xyz):
 
 
 # ===========================================================================
-# WP3 -- RBE2: rigidify the boundary nodes to a 6-DoF master (stubs -- Yannik)
+# WP3 -- RBE2: rigidify the boundary nodes to a 6-DoF master
 # ===========================================================================
 
 def skew(r):
@@ -394,7 +394,7 @@ def apply_rbe2(K, M, T_b, perm, n_b):
 
 
 # ===========================================================================
-# WP4 -- Craig-Bampton reduction                            (stubs -- Yannik)
+# WP4 -- Craig-Bampton reduction
 # ===========================================================================
 
 def craig_bampton(blocks, n_modes):
@@ -432,7 +432,32 @@ def craig_bampton(blocks, n_modes):
     :param n_modes: number of fixed-interface modes to keep
     :return: (M_r, K_r, Psi, Phi, f_fixed_hz) with f_fixed_hz = sqrt(lam)/2pi
     """
-    raise NotImplementedError("WP4 -- Yannik")
+
+    K_bb, K_bi, K_ii = blocks["K_bb"], blocks["K_bi"], blocks["K_ii"]
+    M_bb, M_bi, M_ii = blocks["M_bb"], blocks["M_bi"], blocks["M_ii"]
+
+    # static constraint modes: unit master motion, interior follows statically
+    Psi = -splu(K_ii).solve(K_bi.T)                     # (n_i, 6)
+
+    # fixed-interface modes of the clamped interior (K_ii nonsingular), sorted
+    # ascending and mass-normalized so that Phi.T M_ii Phi == I exactly
+    lam, Phi = eigsh(K_ii, k=n_modes, M=M_ii, sigma=0)
+    order = np.argsort(lam)
+    lam, Phi = lam[order], Phi[:, order]
+    Phi = Phi / np.sqrt(np.diag(Phi.T @ (M_ii @ Phi)))
+
+    # reduced matrices: R^T () R with R = [[I,0],[Psi,Phi]], multiplied out
+    # (see docstring; the zero coupling and diag(lam) are exact by construction)
+    K_r = np.block([[K_bb + K_bi @ Psi, np.zeros((6, n_modes))],
+                    [np.zeros((n_modes, 6)), np.diag(lam)]])
+
+    M_bb_r = M_bb + M_bi @ Psi + Psi.T @ M_bi.T + Psi.T @ (M_ii @ Psi)
+    M_bm_r = M_bi @ Phi + Psi.T @ (M_ii @ Phi)
+    M_r = np.block([[M_bb_r, M_bm_r],
+                    [M_bm_r.T, np.eye(n_modes)]])
+
+    f_fixed_hz = np.sqrt(lam) / (2.0 * np.pi)
+    return M_r, K_r, Psi, Phi, f_fixed_hz
 
 
 # ===========================================================================
@@ -449,7 +474,12 @@ def modal_damping_matrix(M_r, K_r, zeta, f_rbm_tol=1.0):
     with (w^2, V) = eigh(K_r, M_r), V mass-normalized. Matches the 0.3 % modal
     damping of the pyFBS FRF synthesis per substructure.
     """
-    raise NotImplementedError("WP5 -- Claude")
+    from scipy.linalg import eigh
+
+    lam, V = eigh(K_r, M_r)                     # V is M_r-orthonormal
+    w = np.sqrt(np.clip(lam, 0.0, None))
+    w[w < 2.0 * np.pi * f_rbm_tol] = 0.0        # rigid-body modes stay undamped
+    return M_r @ V @ np.diag(2.0 * zeta * w) @ V.T @ M_r
 
 
 @dataclass
@@ -469,10 +499,30 @@ class ReducedSubstructure:
     @classmethod
     def build(cls, name, data, boundary_idx, master_xyz, n_modes, zeta):
         """
-        WP4 wrap-up (Yannik): partition -> rbe2 -> craig_bampton -> damping.
-        ``data`` is the dict from load_or_export.
+        Full reduction of one substructure: RBE2 transformation -> boundary-
+        first partition -> Craig-Bampton -> modal damping.
+
+        :param name: "A" or "B" (report label)
+        :param data: dict from :func:`load_or_export`
+        :param boundary_idx: RBE2 slave node indices (from get_boundary_nodes)
+        :param master_xyz: (3,) RBE2 master position = VP
+        :param n_modes: fixed-interface modes to keep
+        :param zeta: modal damping ratio per elastic mode
         """
-        raise NotImplementedError("WP4 -- Yannik")
+        nodes = data["nodes"]
+        boundary_idx = np.asarray(boundary_idx)
+
+        T_b = rbe2_transformation(nodes, boundary_idx, master_xyz)
+        perm, internal_idx = partition_dofs(len(nodes), boundary_idx)
+        blocks = apply_rbe2(data["K"], data["M"], T_b, perm, len(boundary_idx))
+        M_r, K_r, Psi, Phi, f_fixed_hz = craig_bampton(blocks, n_modes)
+        C_r = modal_damping_matrix(M_r, K_r, zeta)
+
+        print(f"[{name}] reduced {3 * len(nodes)} -> {M_r.shape[0]} DoFs | "
+              f"fixed-interface modes {f_fixed_hz[0]:.1f}..{f_fixed_hz[-1]:.1f} Hz")
+        return cls(name=name, M_r=M_r, C_r=C_r, K_r=K_r, T_b=T_b, Psi=Psi,
+                   Phi=Phi, nodes=nodes, boundary_idx=boundary_idx,
+                   internal_idx=internal_idx)
 
     def recovery_row(self, position, direction):
         """

@@ -17,9 +17,9 @@ from pathlib import Path
 
 import numpy as np
 
-from dynamical_system import (get_boundary_nodes, load_or_export,
-                              natural_frequencies, read_vp_definition,
-                              report_interface)
+from dynamical_system import (ReducedSubstructure, get_boundary_nodes,
+                              load_or_export, natural_frequencies,
+                              read_vp_definition, report_interface)
 
 # ---------------------------------------------------------------------------
 # Paths -- lab_testbench is a local copy of the pyFBS example data (FEM, STL,
@@ -103,9 +103,9 @@ if __name__ == "__main__":
     report_interface("A", substructures["A"]["nodes"], idx_A, VP_XYZ)
     report_interface("B", substructures["B"]["nodes"], idx_B, VP_XYZ)
 
-    # --- Stage 3 (WP3+4, Yannik): RBE2 + Craig-Bampton ----------------------
-    # sub_A = ReducedSubstructure.build("A", substructures["A"], idx_A, VP_XYZ, N_MODES, ZETA)
-    # sub_B = ReducedSubstructure.build("B", substructures["B"], idx_B, VP_XYZ, N_MODES, ZETA)
+    # --- Stage 3 (WP3+4): RBE2 + Craig-Bampton reduction --------------------
+    sub_A = ReducedSubstructure.build("A", substructures["A"], idx_A, VP_XYZ, N_MODES, ZETA)
+    sub_B = ReducedSubstructure.build("B", substructures["B"], idx_B, VP_XYZ, N_MODES, ZETA)
 
     # --- Stage 4 (WP5, Claude): assembly + linear FRF check -----------------
     # --- Stage 5 (WP6, Claude): HBM sweep -> CSV -----------------------------
