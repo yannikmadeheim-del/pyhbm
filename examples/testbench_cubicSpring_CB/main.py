@@ -20,14 +20,15 @@ import numpy as np
 from dynamical_system import load_or_export, natural_frequencies
 
 # ---------------------------------------------------------------------------
-# Paths
+# Paths -- lab_testbench is a local copy of the pyFBS example data (FEM, STL,
+# Measurements); PYFBS_EXAMPLE_DIR is only used to hand the reference CSV over.
 # ---------------------------------------------------------------------------
 HERE = Path(__file__).resolve().parent
 THESIS_ROOT = HERE.parents[3]                    # Fast_numerical_solution_...
 PYFBS_EXAMPLE_DIR = (THESIS_ROOT / "pyFBS_clone" / "pyFBS" / "pyfbs"
                      / "nonlinearFBS" / "examples" / "testbench_cubicSpring")
-FEM_DIR = PYFBS_EXAMPLE_DIR / "lab_testbench" / "FEM"
-XLSX_PATH = PYFBS_EXAMPLE_DIR / "lab_testbench" / "Measurements" / "coupling_example.xlsx"
+FEM_DIR = HERE / "lab_testbench" / "FEM"
+XLSX_PATH = HERE / "lab_testbench" / "Measurements" / "coupling_example.xlsx"
 CSV_OUT = HERE / "reference_rbe2_cb_hbm.csv"
 
 # ---------------------------------------------------------------------------

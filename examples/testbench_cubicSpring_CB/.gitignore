@@ -1,3 +1,7 @@
 # NPZ caches of the full Ansys matrices (~20-50 MB, regenerated from the
-# pyFBS lab_testbench FEM data on first run)
+# lab_testbench FEM data on first run)
 *_full.npz
+
+# local copy of the pyFBS lab_testbench data (~290 MB binaries: FEM, STL,
+# Measurements) -- kept out of git, same policy as the pyFBS repo
+lab_testbench/
