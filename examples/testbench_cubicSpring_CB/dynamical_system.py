@@ -313,7 +313,7 @@ def report_interface(name, nodes, idx, vp_xyz):
 # WP3 -- RBE2: rigidify the boundary nodes to a 6-DoF master (stubs -- Yannik)
 # ===========================================================================
 
-def skew(v):
+def skew(r):
     """
     Skew-symmetric cross-product matrix:  skew(v) @ w == np.cross(v, w).
 
@@ -321,7 +321,9 @@ def skew(v):
          [ vz,   0, -vx],
          [-vy,  vx,   0]]
     """
-    raise NotImplementedError("WP3 -- Yannik")
+    return np.array([[0, -r[2], r[1]],
+                    [r[2], 0, -r[0]],
+                    [-r[1], r[0], 0]])
 
 
 def rbe2_transformation(nodes, boundary_idx, master_xyz):
@@ -343,43 +345,52 @@ def rbe2_transformation(nodes, boundary_idx, master_xyz):
     :param master_xyz: (3,) master/VP position [m]
     :return: T_b (3*nb, 6) dense
     """
-    raise NotImplementedError("WP3 -- Yannik")
+    d = nodes[boundary_idx] - np.asarray(master_xyz)  # (nb, 3) Hebelarme
+    T_b = np.zeros((3 * len(boundary_idx), 6))
+    for p, dp in enumerate(d):
+        T_b[3 * p:3 * p + 3, :3] = np.eye(3)
+        T_b[3 * p:3 * p + 3, 3:] = -skew(dp)  # u_j = u_m + θ×d  ⇒  −skew(d)
+    return T_b
 
 
 def partition_dofs(n_nodes, boundary_idx):
+    """DoF-Permutation für die Boundary-first-Sortierung (Folie, Schritt 2).
+
+    :return: (perm, internal_idx)   # K_sorted = K[perm][:, perm]
     """
-    DoF index sets for the boundary-first partition (slide procedure step 2).
+    internal_idx = np.setdiff1d(np.arange(n_nodes), boundary_idx)  # aufsteigend
+    node_order = np.concatenate([boundary_idx, internal_idx])
+    perm = (3 * node_order[:, None] + np.arange(3)).ravel()
+    return perm, internal_idx
 
-    Node i owns DoF rows [3*i, 3*i+1, 3*i+2] (see load_ansys_substructure).
 
-        b_dofs = (3*boundary_idx[:, None] + [0, 1, 2]).ravel()   # order of T_b!
-        i_dofs = all remaining DoFs, ascending
+def apply_rbe2(K, M, T_b, perm, n_b):
+    """Sortieren + RBE2-Kondensation der Boundary-DoFs auf den 6-DoF-Master.
 
-    :return: (b_dofs, i_dofs) int arrays, disjoint, together all 3*n_nodes DoFs
+    K_s = K[perm][:, perm]          # jetzt: [b-Block | i-Block] zusammenhängend
+    nb3 = 3 * n_b
+    K_bb = K_s[:nb3, :nb3]; K_bi = K_s[:nb3, nb3:]; K_ii = K_s[nb3:, nb3:]
+    ->  K_bb6 = T_b.T @ (K_bb @ T_b)      (6, 6)    dicht
+        K_bi6 = (K_bi.T @ T_b).T          (6, n_i)  dicht -- über die sparse Seite rechnen!
+        K_ii  bleibt sparse (csc für splu in WP4)
+    gleiches für M.  :return: dict(K_bb, K_bi, K_ii, M_bb, M_bi, M_ii)
     """
-    raise NotImplementedError("WP3 -- Yannik")
+    nb3 = 3 * n_b
 
+    def transform_blocks(A):
+        # symmetric A => A_ib = A_bi.T, so only three blocks are returned
+        # (a stored ib copy could silently drift from bi); A_ii stays sparse
+        # for the splu/eigsh factorizations in the Craig-Bampton step.
+        A_s = A[perm][:, perm]
+        A_bb = T_b.T @ (A_s[:nb3, :nb3] @ T_b)     # (6, 6) dense
+        A_bi = (A_s[:nb3, nb3:].T @ T_b).T         # (6, n_i) dense, sparse-side product
+        A_ii = A_s[nb3:, nb3:].tocsc()
+        return A_bb, A_bi, A_ii
 
-def apply_rbe2(K, M, T_b, b_dofs, i_dofs):
-    """
-    Condense the boundary-node DoFs onto the 6 master DoFs.
-
-    With u_b = T_b q_m the transformed blocks are (same for M):
-
-        K_bb (6, 6)   = T_b.T @ K[b, b] @ T_b        (dense)
-        K_bi (6, ni)  = T_b.T @ K[b, i]              (dense -- only 6 rows)
-        K_ii (ni, ni) = K[i, i]                      (keep sparse, csc)
-
-    Slicing pattern for sparse csr: K[np.ix_(b_dofs, b_dofs)] densifies -- do
-    NOT do that for K_ii; use K[b_dofs][:, i_dofs] style slicing and convert
-    only the small results to dense.
-
-    Acceptance (review): K_bb symmetric; rigid-body test K_tilde @ z_rig ~ 0;
-    z.T @ M_tilde @ z for a unit rigid translation equals the substructure mass.
-
-    :return: dict(K_bb, K_bi, K_ii, M_bb, M_bi, M_ii)
-    """
-    raise NotImplementedError("WP3 -- Yannik")
+    K_bb, K_bi, K_ii = transform_blocks(K)
+    M_bb, M_bi, M_ii = transform_blocks(M)
+    return dict(K_bb=K_bb, K_bi=K_bi, K_ii=K_ii,
+                M_bb=M_bb, M_bi=M_bi, M_ii=M_ii)
 
 
 # ===========================================================================
