@@ -1,0 +1,3 @@
+# NPZ caches of the full Ansys matrices (~20-50 MB, regenerated from the
+# pyFBS lab_testbench FEM data on first run)
+*_full.npz
