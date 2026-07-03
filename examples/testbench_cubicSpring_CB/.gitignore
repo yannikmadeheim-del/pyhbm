@@ -11,3 +11,6 @@ interface_check.png
 
 # linear verification figure (regenerable by main.py)
 linear_check.png
+
+# NFRC figure (regenerable by main.py)
+nfrc.png

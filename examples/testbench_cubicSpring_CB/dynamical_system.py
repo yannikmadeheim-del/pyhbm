@@ -595,7 +595,60 @@ def assemble_coupled(sub_A, sub_B, k_diag):
 
 
 # ===========================================================================
-# WP6 -- coupled pyhbm system                                        (Claude)
+# WP6 -- coupled pyhbm system
 # ===========================================================================
-# class CoupledCubicCB(pyhbm.SecondOrderODE) and build_coupled_system() will be
-# added here: f_nl = Bc.T (alpha x^3 + beta xdot^3) on x_r = Bc q.
+
+try:                                     # pyhbm is not pip-installed: resolve
+    from pyhbm import SecondOrderODE     # the repo's src/ relative to this file
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+    from pyhbm import SecondOrderODE
+
+
+class CoupledCubicCB(SecondOrderODE):
+    """
+    The coupled reduced testbench as a pyhbm second-order system:
+
+        M q'' + C q' + K q + Bc^T (alpha * x^3 + beta * xdot^3) = f_r F0 cos(tau)
+
+    with x = Bc q the 6 relative master DoFs (VP_A - VP_B). The LINEAR spring
+    stiffness k is already inside K (see assemble_coupled); only the cubic
+    stiffness/damping terms are nonlinear -- the same bushing law as the pyFBS
+    example's TestbenchCubicSpring. qdot passed by pyhbm is the PHYSICAL
+    velocity, so beta * xdot^3 needs no extra omega scaling.
+    """
+    is_real_valued = True
+
+    def __init__(self, M, C, K, Bc, alpha_diag, beta_diag, f_r, F0):
+        self.mass_matrix = M
+        self.damping_matrix = C
+        self.stiffness_matrix = K
+        self.dimension = M.shape[0]
+        self.polynomial_degree = 3            # sets the AFT sampling (exact)
+        self.Bc = Bc
+        self.alpha_diag = np.asarray(alpha_diag, dtype=float)
+        self.beta_diag = np.asarray(beta_diag, dtype=float)
+        self.f_r = np.asarray(f_r, dtype=float)
+        self.F0 = float(F0)
+
+    def external_term(self, adimensional_time):
+        tau = np.asarray(adimensional_time)
+        return (self.F0 * np.cos(tau))[:, None, None] * self.f_r[None, :, None]
+
+    def nonlinear_term(self, q, q_dot, adimensional_time):
+        x = np.einsum("ij,tjk->tik", self.Bc, q)          # (Nt, 6, 1)
+        xd = np.einsum("ij,tjk->tik", self.Bc, q_dot)
+        f_int = (self.alpha_diag[None, :, None] * x ** 3
+                 + self.beta_diag[None, :, None] * xd ** 3)
+        return np.einsum("ji,tjk->tik", self.Bc, f_int)   # Bc^T f_int
+
+    def jacobian_nonlinear_term(self, q, q_dot, adimensional_time):
+        x = np.einsum("ij,tjk->tik", self.Bc, q)[:, :, 0]           # (Nt, 6)
+        diag = 3.0 * self.alpha_diag[None, :] * x ** 2
+        return np.einsum("ji,tj,jk->tik", self.Bc, diag, self.Bc)   # (Nt, d, d)
+
+    def jacobian_nonlinear_term_qdot(self, q, q_dot, adimensional_time):
+        xd = np.einsum("ij,tjk->tik", self.Bc, q_dot)[:, :, 0]
+        diag = 3.0 * self.beta_diag[None, :] * xd ** 2
+        return np.einsum("ji,tj,jk->tik", self.Bc, diag, self.Bc)

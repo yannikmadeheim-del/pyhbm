@@ -13,14 +13,21 @@ exactly -- any change there must be reflected here, otherwise the reference and
 the pyFBS curve solve different problems.
 """
 
+import sys
 from pathlib import Path
+
+try:                          # pyhbm's progress line prints unicode (Δω);
+    sys.stdout.reconfigure(   # Windows consoles default to cp1252
+        encoding="utf-8", line_buffering=True)
+except (AttributeError, ValueError):
+    pass
 
 import numpy as np
 
-from dynamical_system import (ReducedSubstructure, assemble_coupled,
-                              get_boundary_nodes, load_or_export,
-                              natural_frequencies, read_vp_definition,
-                              report_interface)
+from dynamical_system import (CoupledCubicCB, ReducedSubstructure,
+                              assemble_coupled, get_boundary_nodes,
+                              load_or_export, natural_frequencies,
+                              read_vp_definition, report_interface)
 
 # ---------------------------------------------------------------------------
 # Paths -- lab_testbench is a local copy of the pyFBS example data (FEM, STL,
@@ -81,6 +88,76 @@ MATING_TOL = 1e-6                                # coincidence tolerance [m]
 # pyFBS example data at 1 Hz resolution -- see linear_frf_check
 BACKBONE_CSV = HERE / "linear_backbone.csv"
 LINEAR_PNG = HERE / "linear_check.png"
+
+
+RUN_HBM = True                                   # Stage 5 (takes ~minutes)
+NFRC_PNG = HERE / "nfrc.png"
+
+
+def run_hbm(system):
+    """
+    Multiharmonic balance + arc-length continuation of the coupled system,
+    swept downward from F_HI to F_LO like the pyFBS example (cold zero start
+    at the top of the window, reference direction pointing to lower omega).
+    """
+    from pyhbm import FourierOmegaPoint, HarmonicBalanceMethod
+
+    solver = HarmonicBalanceMethod(harmonics=HARMONICS, second_order_ode=system)
+    w_lo, w_hi = 2.0 * np.pi * F_LO, 2.0 * np.pi * F_HI
+    ig = FourierOmegaPoint.zero_amplitude(dimension=system.dimension, omega=w_hi)
+    rd = FourierOmegaPoint.new_from_first_harmonic(
+        np.zeros((system.dimension, 1), dtype=complex), omega=-1.0)
+
+    return solver.solve_and_continue(
+        initial_guess=ig,
+        initial_reference_direction=rd,
+        maximum_number_of_solutions=20000,
+        angular_frequency_range=[w_lo, w_hi],
+        solver_kwargs={"maximum_iterations": 300,
+                       "absolute_tolerance": system.F0 * 1e-6},
+        step_length_adaptation_kwargs={"base": 4.0,
+                                       "initial_step_length": 0.1 * 2 * np.pi,
+                                       "maximum_step_length": 5 * 2 * np.pi,
+                                       "minimum_step_length": 1e-7,
+                                       "goal_number_of_iterations": 3},
+        jacobian_update_frequency=1,
+    )
+
+
+def export_csv(solution_set, t_out):
+    """
+    Reference CSV along the continuation branch (NOT sorted by frequency --
+    the NFRC is multivalued around the bent resonances). amp_m is the peak
+    physical displacement over one period at the output DoF, the exact
+    quantity the pyFBS example plots; amp_h1_m is the first-harmonic
+    amplitude alone.
+    """
+    import shutil
+
+    from pyhbm import Fourier, Fourier_Real
+
+    h1 = list(Fourier.harmonics).index(1)
+    n = len(solution_set.omega)
+    freq = np.asarray(solution_set.omega) / (2.0 * np.pi)
+    amp = np.empty(n)
+    amp_h1 = np.empty(n)
+    for i, fourier in enumerate(solution_set.fourier):
+        Fourier_Real.compute_time_series(fourier)
+        u_out = fourier.time_series[:, :, 0] @ t_out          # (Nt,)
+        amp[i] = np.abs(u_out).max()
+        c1 = fourier.coefficients[h1, :, 0] @ t_out
+        amp_h1[i] = 2.0 * abs(c1) / Fourier.number_of_time_samples
+
+    np.savetxt(CSV_OUT, np.c_[freq, np.asarray(solution_set.omega), amp, amp_h1],
+               delimiter=",", comments="",
+               header="freq_hz,omega_rad_s,amp_m,amp_h1_m")
+    print(f"reference written: {CSV_OUT} ({n} branch points)")
+
+    pyfbs_copy = PYFBS_EXAMPLE_DIR / CSV_OUT.name
+    if PYFBS_EXAMPLE_DIR.exists():
+        shutil.copy2(CSV_OUT, pyfbs_copy)
+        print(f"copied to pyFBS example: {pyfbs_copy}")
+    return freq, amp
 
 
 def linear_frf_check(M, C, K, t_out, f_r):
@@ -160,6 +237,28 @@ if __name__ == "__main__":
                             np.zeros(sub_B.M_r.shape[0])])
     f_r = np.concatenate([np.zeros(sub_A.M_r.shape[0]),
                           sub_B.recovery_row(INP_POS, INP_DIR)])
-    linear_frf_check(M, C, K, t_out, f_r)
+    lin_freqs, lin_mag = linear_frf_check(M, C, K, t_out, f_r)
 
-    # --- Stage 5 (WP6, Claude): HBM sweep -> CSV -----------------------------
+    # --- Stage 5 (WP6): HBM sweep -> reference CSV ---------------------------
+    if RUN_HBM:
+        import matplotlib.pyplot as plt
+
+        system = CoupledCubicCB(M, C, K, Bc, ALPHA_DIAG, BETA_DIAG, f_r, F0)
+        solution_set = run_hbm(system)
+        freq_nl, amp_nl = export_csv(solution_set, t_out)
+
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.semilogy(lin_freqs, lin_mag * F0, "-", color="#999999", lw=1.2,
+                    label=f"linear (alpha=0) x F0={F0:g} N")
+        ax.semilogy(freq_nl, amp_nl, "-", color="#d62728", lw=1.2,
+                    label="RBE2+CB+HBM nonlinear forced response")
+        ax.set_xlim(F_LO, F_HI)
+        ax.set_xlabel("Frequency [Hz]")
+        ax.set_ylabel("Amplitude |u_out|  [m]")
+        ax.set_title("Cubic-spring testbench: independent RBE2+CB+HBM reference")
+        ax.grid(True, which="both", alpha=0.3)
+        ax.legend()
+        fig.tight_layout()
+        fig.savefig(NFRC_PNG, dpi=110)
+        print(f"NFRC figure: {NFRC_PNG}")
+        plt.show()
