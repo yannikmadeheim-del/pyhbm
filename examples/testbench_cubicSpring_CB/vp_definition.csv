@@ -1,0 +1,7 @@
+Grouping,Quantity,Name,Description,Position_1,Position_2,Position_3,Direction_1,Direction_2,Direction_3
+10,Acceleration,VP1_ux,ux,0.038895,0.348107,0.007,1,0,0
+10,Acceleration,VP1_uy,uy,0.038895,0.348107,0.007,0,1,0
+10,Acceleration,VP1_uz,uz,0.038895,0.348107,0.007,0,0,1
+10,Rotational acceleration,VP1_rx,rx,0.038895,0.348107,0.007,1,0,0
+10,Rotational acceleration,VP1_ry,ry,0.038895,0.348107,0.007,0,1,0
+10,Rotational acceleration,VP1_rz,rz,0.038895,0.348107,0.007,0,0,1

@@ -5,3 +5,6 @@
 # local copy of the pyFBS lab_testbench data (~290 MB binaries: FEM, STL,
 # Measurements) -- kept out of git, same policy as the pyFBS repo
 lab_testbench/
+
+# scratch visualization of the interface region (regenerable)
+interface_check.png

@@ -11,11 +11,12 @@ Pipeline (procedure of "Substructuring in Commercial Tools", slide 10):
 
 Work split:
   WP1 (Ansys export)            -- implemented (Claude)
-  WP2 (interface node sets)     -- stub, Yannik
+  WP2 (interface node sets)     -- implemented (Claude); node lists exported
+                                   from Ansys Mechanical named selections
   WP3 (RBE2)                    -- stub, Yannik
   WP4 (Craig-Bampton)           -- stub, Yannik
-  WP5 (damping/assembly/checks) -- Claude, after WP2-4 review
-  WP6 (pyhbm system + HBM)      -- Claude, after WP2-4 review
+  WP5 (damping/assembly/checks) -- Claude, after WP3-4 review
+  WP6 (pyhbm system + HBM)      -- Claude, after WP3-4 review
 
 Every stub's docstring contains the exact math, shapes and the acceptance check
 it must pass. All positions are in metres, global Ansys coordinate system.
@@ -161,26 +162,92 @@ def natural_frequencies(K, M, n=12):
 # WP2 -- interface node sets (boundary partition)          (stubs -- Yannik)
 # ===========================================================================
 
+def read_vp_definition(csv_path, grouping=None):
+    """
+    Virtual-point / RBE2-master definition of THIS example (self-contained,
+    no pyFBS dependency): vp_definition.csv mirrors the row structure of the
+    pyFBS VP_Channels sheet -- one row per VP DoF (ux, uy, uz, rx, ry, rz)
+    with Grouping, Position_1..3 [m] and Direction_1..3. Move the joint by
+    editing the positions there.
+
+    All rows must share one position, and the directions must be the global
+    axes -- a rotated VP frame would change the meaning of the 6 master DoFs
+    (and of the spring's k/alpha/beta diagonals) and is rejected.
+
+    :param csv_path: vp_definition.csv next to main.py
+    :param grouping: VP grouping id; None -> all rows (single-VP file)
+    :return: (3,) VP position [m]
+    """
+    import csv
+
+    with open(csv_path, newline="") as fh:
+        rows = [r for r in csv.DictReader(fh)
+                if grouping is None or int(r["Grouping"]) == grouping]
+    assert rows, f"{csv_path}: no VP rows (grouping={grouping})"
+
+    pos = np.array([[float(r[f"Position_{i}"]) for i in (1, 2, 3)] for r in rows])
+    dirs = np.array([[float(r[f"Direction_{i}"]) for i in (1, 2, 3)] for r in rows])
+    assert np.ptp(pos, axis=0).max() < 1e-12, \
+        f"{csv_path}: rows differ in position -- multiple VPs? pass grouping="
+    assert np.allclose(dirs, np.vstack([np.eye(3)] * 2)[:len(dirs)]), \
+        f"{csv_path}: directions are not the global axes -- rotated VP frames unsupported"
+    return pos[0]
+
+
+def find_file_nodes(nodes, nnum, path):
+    """
+    Primary interface definition ("file"): a node list exported from an Ansys
+    Mechanical named selection / node component (bore wall of the VP hole).
+
+    Expected format: a header line ("Knotennummer" / "Node Number") followed
+    by one Ansys node id per line; extra columns are ignored. The ids use the
+    ORIGINAL Ansys numbering, which survives the chain cdb -> blocked cdb ->
+    Mechanical unchanged (verified bit-identical), and are mapped onto 0-based
+    rows of ``nodes`` via ``nnum``. Unknown ids abort hard -- they would mean
+    Mechanical renumbered the mesh or an eliminated support node was selected.
+
+    :param nodes: (n, 3) node coordinates of ONE substructure [m]
+    :param nnum: (n,) original Ansys node ids of these nodes
+    :param path: exported .txt file
+    :return: sorted int array of 0-based node indices, duplicates removed
+    """
+    ids = []
+    with open(path) as fh:
+        for line in fh:
+            tok = line.split()
+            if tok and tok[0].isdigit():
+                ids.append(int(tok[0]))
+    assert ids, f"no node ids found in {path}"
+
+    pos = {int(n): i for i, n in enumerate(nnum)}
+    missing = [i for i in ids if i not in pos]
+    assert not missing, (
+        f"{path}: {len(missing)} node ids unknown to the imported model "
+        f"(e.g. {missing[:5]}) -- renumbered mesh or eliminated nodes?")
+    return np.unique([pos[i] for i in ids])
+
+
 def find_mating_nodes(nodes_A, nodes_B, tol):
     """
-    Coincident-node detection between the two substructure meshes: the bolted
-    footprint where A and B touch (primary interface definition, "mating").
-
-    Approach: tree = scipy.spatial.cKDTree(nodes_B); dist, j = tree.query(nodes_A);
-    a node pair "mates" when dist <= tol. Return the 0-based node indices
-    (idx_A, idx_B) of the paired nodes, each without duplicates.
-
-    Acceptance: len(idx_A) == len(idx_B) > 0; print the count and the bounding
-    box of the selected nodes -- it must sit around the VP (0.0389, 0.3481, 0.007).
-    If the count is 0 the meshes are non-conforming: stop and we pick a fallback
-    together at review.
+    Coincident-node detection between the two substructure meshes ("mating"):
+    the discrete points where A and B share nodes in the assembly (here: 7
+    pairs along the joint strip). Kept as the automatic baseline method.
 
     :param nodes_A: (nA, 3) node coordinates of substructure A [m]
     :param nodes_B: (nB, 3) node coordinates of substructure B [m]
-    :param tol: coincidence tolerance [m], e.g. 1e-6
+    :param tol: coincidence tolerance [m]; anything in 1e-8..1e-4 gives the
+        same 7 pairs (next-nearest distance is 2e-4 m)
     :return: (idx_A, idx_B) int arrays, one entry per mating node pair
     """
-    raise NotImplementedError("WP2 -- Yannik")
+    from scipy.spatial import cKDTree
+
+    dist, j = cKDTree(nodes_B).query(nodes_A)
+    mask = dist <= tol
+    idx_A = np.nonzero(mask)[0]
+    idx_B = j[mask]
+    assert len(idx_A) > 0, "no coincident nodes -- meshes are non-conforming"
+    assert len(np.unique(idx_B)) == len(idx_B), "tol too loose: pairing not 1:1"
+    return idx_A, idx_B
 
 
 def find_vpt_nodes(nodes, xlsx_path, substructure, grouping=10):
@@ -188,26 +255,58 @@ def find_vpt_nodes(nodes, xlsx_path, substructure, grouping=10):
     Alternative interface definition ("vpt"): the FE nodes the virtual-point
     transformation actually sees -- all Grouping==``grouping`` rows of the
     sheets Channels_<substructure> and Impacts_<substructure>, positions
-    snapped to the nearest FE node (cKDTree.query), duplicates removed.
+    snapped to the nearest FE node, duplicates removed.
 
     :param nodes: (n, 3) node coordinates of ONE substructure [m]
-    :param xlsx_path: coupling_example.xlsx (pandas.read_excel, one sheet each)
+    :param xlsx_path: coupling_example.xlsx of the pyFBS example
     :param substructure: "A" or "B" (selects the sheet names)
-    :return: int array of 0-based node indices
+    :return: sorted int array of 0-based node indices
     """
-    raise NotImplementedError("WP2 -- Yannik")
+    import pandas as pd
+    from scipy.spatial import cKDTree
+
+    pos = np.vstack([
+        df.loc[df["Grouping"] == grouping,
+               ["Position_1", "Position_2", "Position_3"]].to_numpy(float)
+        for df in (pd.read_excel(xlsx_path, sheet_name=f"{kind}_{substructure}")
+                   for kind in ("Channels", "Impacts"))])
+    assert len(pos), f"no Grouping=={grouping} rows for substructure {substructure}"
+    dist, idx = cKDTree(nodes).query(pos)
+    return np.unique(idx)
 
 
-def get_boundary_nodes(method, data_A, data_B, xlsx_path=None, tol=1e-6):
+def get_boundary_nodes(method, data_A, data_B, xlsx_path=None, tol=1e-6,
+                       file_A=None, file_B=None):
     """
     The single switch point for the interface definition.
 
-    method == "mating": find_mating_nodes(...) on both meshes.
-    method == "vpt":    find_vpt_nodes(...) per substructure.
+    method == "file":   node lists exported from Ansys Mechanical (file_A/B)
+    method == "mating": coincident-node detection on both meshes
+    method == "vpt":    VPT sensor/impact nodes per substructure
 
     :return: (idx_A, idx_B) -- 0-based boundary node indices per substructure
     """
-    raise NotImplementedError("WP2 -- Yannik")
+    if method == "file":
+        return (find_file_nodes(data_A["nodes"], data_A["nnum"], file_A),
+                find_file_nodes(data_B["nodes"], data_B["nnum"], file_B))
+    if method == "mating":
+        return find_mating_nodes(data_A["nodes"], data_B["nodes"], tol)
+    if method == "vpt":
+        return (find_vpt_nodes(data_A["nodes"], xlsx_path, "A"),
+                find_vpt_nodes(data_B["nodes"], xlsx_path, "B"))
+    raise ValueError(f"unknown interface method {method!r}")
+
+
+def report_interface(name, nodes, idx, vp_xyz):
+    """
+    Plausibility report for a boundary node set: count, in-plane distance to
+    the virtual point (bore wall -> a ring of a few mm) and z extent.
+    """
+    sel = nodes[idx]
+    r_xy = np.linalg.norm(sel[:, :2] - np.asarray(vp_xyz)[:2], axis=1) * 1e3
+    z = sel[:, 2] * 1e3
+    print(f"[{name}] {len(idx)} boundary nodes | r_xy to VP "
+          f"{r_xy.min():.2f}..{r_xy.max():.2f} mm | z {z.min():.2f}..{z.max():.2f} mm")
 
 
 # ===========================================================================
