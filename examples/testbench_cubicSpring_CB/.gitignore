@@ -8,3 +8,6 @@ lab_testbench/
 
 # scratch visualization of the interface region (regenerable)
 interface_check.png
+
+# linear verification figure (regenerable by main.py)
+linear_check.png

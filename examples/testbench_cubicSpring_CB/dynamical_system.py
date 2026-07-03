@@ -526,18 +526,76 @@ class ReducedSubstructure:
 
     def recovery_row(self, position, direction):
         """
-        WP5 (Claude). Row t (nr,) of the physical<->reduced map for the DoF
-        "displacement at `position` in `direction`": u = t @ q_r, and the
-        generalized force of a point force F*direction there is f_r = t * F.
-        Position snaps to the nearest FE node; internal node -> direction @
-        [Psi Phi] rows, boundary node -> direction @ T_b rows (eta part zero).
+        Row t (nr,) of the physical<->reduced map for the scalar DoF
+        "displacement at ``position`` in ``direction``": u = t @ q_r, and by
+        the transpose of the same map a point force F*direction there enters
+        the reduced equations as f_r = t * F.
+
+        The position snaps to the nearest FE node (like pyfbs
+        update_locations_df). Internal node -> direction projected onto its
+        [Psi | Phi] rows; boundary node -> onto its T_b rows (eta part zero,
+        the node moves rigidly with the master).
         """
-        raise NotImplementedError("WP5 -- Claude")
+        pos = np.asarray(position, dtype=float)
+        dvec = np.asarray(direction, dtype=float)
+        dist = np.linalg.norm(self.nodes - pos, axis=1)
+        j = int(np.argmin(dist))
+        if dist[j] > 5e-3:
+            print(f"[{self.name}] recovery_row: snapped {dist[j] * 1e3:.2f} mm "
+                  f"to node {j} -- check the position")
+
+        row = np.zeros(self.M_r.shape[0])
+        hit = np.nonzero(self.boundary_idx == j)[0]
+        if hit.size:                                   # boundary (RBE2 slave) node
+            p = int(hit[0])
+            row[:6] = dvec @ self.T_b[3 * p:3 * p + 3, :]
+        else:                                          # internal node
+            q = int(np.searchsorted(self.internal_idx, j))
+            assert self.internal_idx[q] == j
+            row[:6] = dvec @ self.Psi[3 * q:3 * q + 3, :]
+            row[6:] = dvec @ self.Phi[3 * q:3 * q + 3, :]
+        return row
 
 
 # ===========================================================================
-# WP6 -- coupled pyhbm system                     (Claude, after WP2-4 review)
+# WP5 -- coupled linear system (assembly + spring)
+# ===========================================================================
+
+def assemble_coupled(sub_A, sub_B, k_diag):
+    """
+    Couple the two reduced substructures through the linear part of the joint.
+
+    Coordinates q = [q_mA (6), eta_A | q_mB (6), eta_B]; M, C, K are block
+    diagonal, and the LINEAR spring stiffness goes into K:
+
+        x_r = Bc q  (6 relative master DoFs, +1 on A, -1 on B -- same signs
+        as the pyFBS example's signed-Boolean matrix)
+        K += Bc.T @ diag(k_diag) @ Bc
+
+    The cubic terms (alpha x^3 + beta xdot^3) stay nonlinear and are applied
+    by the pyhbm system class in WP6.
+
+    :param sub_A/sub_B: :class:`ReducedSubstructure`
+    :param k_diag: (6,) linear joint stiffness [N/m, N/m, N/m, Nm/rad x3]
+    :return: (M, C, K, Bc) dense, d = nrA + nrB
+    """
+    from scipy.linalg import block_diag
+
+    nrA = sub_A.M_r.shape[0]
+    d = nrA + sub_B.M_r.shape[0]
+
+    Bc = np.zeros((6, d))
+    Bc[:, :6] = np.eye(6)                    # A master
+    Bc[:, nrA:nrA + 6] = -np.eye(6)          # B master
+
+    M = block_diag(sub_A.M_r, sub_B.M_r)
+    C = block_diag(sub_A.C_r, sub_B.C_r)
+    K = block_diag(sub_A.K_r, sub_B.K_r) + Bc.T @ np.diag(k_diag) @ Bc
+    return M, C, K, Bc
+
+
+# ===========================================================================
+# WP6 -- coupled pyhbm system                                        (Claude)
 # ===========================================================================
 # class CoupledCubicCB(pyhbm.SecondOrderODE) and build_coupled_system() will be
-# added here: block-diagonal assembly of A and B, signed-Boolean Bc on the two
-# 6-DoF masters, linear spring k into K, f_nl = Bc.T (alpha x^3 + beta xdot^3).
+# added here: f_nl = Bc.T (alpha x^3 + beta xdot^3) on x_r = Bc q.

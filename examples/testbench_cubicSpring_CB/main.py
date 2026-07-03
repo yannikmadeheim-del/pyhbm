@@ -17,9 +17,10 @@ from pathlib import Path
 
 import numpy as np
 
-from dynamical_system import (ReducedSubstructure, get_boundary_nodes,
-                              load_or_export, natural_frequencies,
-                              read_vp_definition, report_interface)
+from dynamical_system import (ReducedSubstructure, assemble_coupled,
+                              get_boundary_nodes, load_or_export,
+                              natural_frequencies, read_vp_definition,
+                              report_interface)
 
 # ---------------------------------------------------------------------------
 # Paths -- lab_testbench is a local copy of the pyFBS example data (FEM, STL,
@@ -76,6 +77,52 @@ IFACE_A_TXT = FEM_DIR / "IFACE_A.txt"
 IFACE_B_TXT = FEM_DIR / "IFACE_B.txt"
 MATING_TOL = 1e-6                                # coincidence tolerance [m]
 
+# linear verification: pyFBS LM-FBS backbone (alpha=0), dumped once from the
+# pyFBS example data at 1 Hz resolution -- see linear_frf_check
+BACKBONE_CSV = HERE / "linear_backbone.csv"
+LINEAR_PNG = HERE / "linear_check.png"
+
+
+def linear_frf_check(M, C, K, t_out, f_r):
+    """
+    Receptance |u_out / F_in| of the coupled LINEAR system (cubic terms off,
+    linear spring in K) by direct solves, overlaid with the pyFBS linear
+    backbone. This isolates reduction/mapping/damping errors before any HBM;
+    the remaining gap is the modelling difference RBE2 vs VPT.
+    """
+    import matplotlib.pyplot as plt
+
+    freqs = np.arange(F_LO, F_HI + 0.5, 1.0)
+    mag = np.empty(len(freqs))
+    for i, f in enumerate(freqs):
+        w = 2.0 * np.pi * f
+        Z = -w**2 * M + 1j * w * C + K
+        mag[i] = abs(t_out @ np.linalg.solve(Z, f_r))
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.semilogy(freqs, mag, "-", color="#d62728", lw=1.2,
+                label="RBE2 + CB reduced model (direct solve)")
+    if BACKBONE_CSV.exists():
+        bb = np.loadtxt(BACKBONE_CSV, delimiter=",", comments="#")
+        sel = (bb[:, 0] >= F_LO) & (bb[:, 0] <= F_HI)
+        ax.semilogy(bb[sel, 0], bb[sel, 1], "--", color="#555555", lw=1.0,
+                    label="pyFBS linear backbone (VPT + LM-FBS)")
+        ratio = np.interp(bb[sel, 0], freqs, mag) / bb[sel, 1]
+        print(f"linear check vs pyFBS backbone: |Y| ratio median "
+              f"{np.median(ratio):.3f} (min {ratio.min():.3f}, "
+              f"max {ratio.max():.3f})")
+    else:
+        print(f"note: {BACKBONE_CSV.name} not found -- plotting reduced model only")
+    ax.set_xlabel("Frequency [Hz]")
+    ax.set_ylabel("|u_out / F_in|  [m/N]")
+    ax.set_title("Linear verification: RBE2+CB reduction vs pyFBS backbone")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(LINEAR_PNG, dpi=110)
+    print(f"linear check figure: {LINEAR_PNG}")
+    return freqs, mag
+
 
 if __name__ == "__main__":
     # --- Stage 1 (WP1): full matrices + free-free eigencheck ---------------
@@ -107,5 +154,12 @@ if __name__ == "__main__":
     sub_A = ReducedSubstructure.build("A", substructures["A"], idx_A, VP_XYZ, N_MODES, ZETA)
     sub_B = ReducedSubstructure.build("B", substructures["B"], idx_B, VP_XYZ, N_MODES, ZETA)
 
-    # --- Stage 4 (WP5, Claude): assembly + linear FRF check -----------------
+    # --- Stage 4 (WP5): assembly + linear FRF check --------------------------
+    M, C, K, Bc = assemble_coupled(sub_A, sub_B, K_DIAG)
+    t_out = np.concatenate([sub_A.recovery_row(OUT_POS, OUT_DIR),
+                            np.zeros(sub_B.M_r.shape[0])])
+    f_r = np.concatenate([np.zeros(sub_A.M_r.shape[0]),
+                          sub_B.recovery_row(INP_POS, INP_DIR)])
+    linear_frf_check(M, C, K, t_out, f_r)
+
     # --- Stage 5 (WP6, Claude): HBM sweep -> CSV -----------------------------
