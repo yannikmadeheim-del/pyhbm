@@ -1,8 +1,8 @@
 """Central configuration for the TWO-ROD vibro-impact example.
 
-Holds the physics/numerics shared by the quicklook (``main.py``) and the method
-study (``methodology_comparison.py``), plus the comparison SWITCHBOARD that turns
-individual variants and parameter sweeps on/off.
+Holds the physics/numerics and the comparison SWITCHBOARD for the method study
+(``studies/methodology_comparison.py``) -- the variants and parameter sweeps that
+compare AFT vs DLFT and numerical vs experimental FRF.
 
 Differences vs. the single-rod example
 --------------------------------------
@@ -21,7 +21,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from systems import RodParams
+from dynamical_system import RodParams
 
 # ============================ physics / discretization ======================
 
@@ -64,28 +64,6 @@ STEP_KWARGS = {
 MAX_SOLUTIONS = 1000
 
 
-# ============================ reference (ground truth) ======================
-# make_reference.py runs DLFT (rigid tip-to-tip contact) on the EXACT (numerical)
-# FRF with a very small step length and writes the branch to CSV.
-# methodology_comparison.py loads that CSV as the swappable "original" and
-# measures each variant's trajectory error against it.
-
-REFERENCE_LABEL = "DLFT/num (CSV)"
-# NOTE: deliberately NOT ultra-dense.  The rigid grazing corner makes the branch
-# tangent jump discontinuously; with very small steps the sign-aligned predictor
-# flips there and the continuation retraces the no-contact branch instead of
-# entering contact.  Moderate adaptive steps leap over the corner (verified) and
-# are plenty for a first-test reference.
-REFERENCE_STEP_KWARGS = {
-    "base":                      4.0,
-    "initial_step_length":       1e-3,
-    "maximum_step_length":       2e-3,
-    "minimum_step_length":       1e-7,
-    "goal_number_of_iterations": 3,
-}
-REFERENCE_MAX_SOLUTIONS = 10000             # enough to fully trace the branch
-
-
 # ============================ comparison switchboard ========================
 # methodology_comparison.py reads this.  Flip a flag off to skip that variant;
 # each sweep list controls how many branches are computed for that axis.
@@ -101,8 +79,7 @@ RUN = {
 # Parameter sweeps (one-axis-at-a-time around BASELINE).  A single-element list =
 # no sweep on that axis (uses the baseline below); a multi-element list traces one
 # branch per value.
-#   LB_rel -> ALL variants (rod-B length L_B / L_A; changes the SYSTEM, so each
-#             value needs its own reference CSV -- make_reference.py handles that)
+#   LB_rel -> ALL variants (rod-B length L_B / L_A; changes the SYSTEM)
 #   k_rel  -> AFT only (penalty stiffness k_c / k_rod; DLFT is penalty-free)
 #   alpha  -> AFT only (np.inf = WITHOUT regularization, finite = WITH)
 SWEEPS = {

@@ -1,6 +1,6 @@
 """System definition for the SDOF vibro-impact validation example.
 
-Single-DOF mass-spring-damper against a rigid wall, written in FBS form so the
+Single-DOF mass-spring-damper against a "flexible" wall, written in FBS form so the
 unilateral contact is enforced by DLFTContact on the interface DOF.  See main.py.
 """
 import sys

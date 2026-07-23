@@ -54,10 +54,10 @@ from dynamical_system import RodVibroImpactFlexible
 
 
 # ============================ parameters ====================================
-GAP       = 0.2e-3       # g0: wall offset [m]  (Vadcard Table 1)
+GAP       = 0.2e-3       # g0: wall offset [m]
 HARMONICS = list(range(0, 21))   # 0..20  -> H = 20
-POLY_DEG  = 30                   # N = (POLY_DEG+1)*20 + 1 = 421 time samples
-F0        = 25e3                 # f_ex: harmonic forcing at node B [N]  (Vadcard)
+POLY_DEG  = 30                   # N = (POLY_DEG+1)*Highest_Harmonic + 1
+F0        = 25e3                 # f_ex: harmonic forcing at node B [N]
 SAVE_PNG  = False                # set True to write the figure to disk
 
 # Obstacle stiffnesses to sweep, as multiples of k_rod = E*A/L

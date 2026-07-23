@@ -31,19 +31,23 @@ Run:  python methodology_comparison.py
 import sys
 from pathlib import Path
 
-# This study lives in studies/; put the example root (its parent) on the path so
-# the shared modules (_setup, config, systems, frf, run) resolve, while the sibling
-# `plotting` module resolves locally from studies/.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import _setup  # noqa: F401
+# This study lives in studies/.  config/frf/run/plotting are local to studies/; the
+# example root (parent of studies/) provides dynamical_system; pyhbm is an editable
+# install (src/ is added too for portability).
+_here = Path(__file__).resolve().parent
+sys.path.insert(0, str(_here.parent.parent.parent.parent / "src"))   # pyhbm src
+sys.path.insert(0, str(_here.parent))                                # example root -> dynamical_system
+try:
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+except (AttributeError, ValueError):
+    pass
 
 import numpy as np
 
 from pyhbm import DLFTContact, AFT
 
 import config as cfg
-from systems import TwoRodVibroImpact, TwoRodPenaltyContact
+from dynamical_system import TwoRodVibroImpact, TwoRodPenaltyContact
 from frf import make_numerical_provider, make_experimental_provider
 from run import run_branch, linear_relative, SIGNALS
 import plotting
