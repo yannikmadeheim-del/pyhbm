@@ -234,7 +234,13 @@ class HarmonicBalanceMethod:
 			progress = (solution.omega-angular_frequency_range[0])/(angular_frequency_range[-1]-angular_frequency_range[0])
 
 			if verbose:
-				print("progress {:.3f} %".format(100*progress), f"\titerations {iterations}", "\tΔω {:.2e}".format(predictor_vector[-1,0]), end="\r")
+				delta_omega = solution.omega - previous_solution.omega
+				print("progress {:6.2f} %".format(100*progress),
+					  "\tf {:9.2f} Hz".format(solution.omega/(2*np.pi)),
+					  "\titerations {:3d}".format(iterations),
+					  "\tΔω {:+.2e} rad/s".format(delta_omega),
+					  "\tds {:.2e}".format(step_length_adaptation.step_length*omega_scale),
+					  "   ", end="\r")
 
 			if  not (angular_frequency_range[0] <= solution.omega <= angular_frequency_range[-1]):
 				print(f"\nTerminate: outside frequency range after {solution_number+1} solutions")
