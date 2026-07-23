@@ -1,10 +1,17 @@
-# NPZ caches of the full Ansys matrices (~20-50 MB, regenerated from the
-# lab_testbench FEM data on first run)
-*_full.npz
+# The Ansys K/M caches are deliberately TRACKED: they are what lets a fresh
+# clone run without the 290 MB of FEM binaries or ansys-mapdl-reader installed.
+# Regenerating them from lab_testbench/FEM needs `pip install ansys-mapdl-reader`.
 
 # local copy of the pyFBS lab_testbench data (~290 MB binaries: FEM, STL,
-# Measurements) -- kept out of git, same policy as the pyFBS repo
-lab_testbench/
+# Measurements) -- kept out of git, same policy as the pyFBS repo, EXCEPT the
+# one spreadsheet main.py opens at runtime (channel definitions)
+lab_testbench/*
+!lab_testbench/Measurements/
+lab_testbench/Measurements/*
+!lab_testbench/Measurements/coupling_example.xlsx
+
+# zipped copy of lab_testbench used to move the data between machines
+lab_testbench.zip
 
 # scratch visualization of the interface region (regenerable)
 interface_check.png
