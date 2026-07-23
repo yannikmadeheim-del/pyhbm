@@ -115,11 +115,12 @@ class CorrectorParameterization(object):
 		"""
 
 	def __init__(self, *, predictor_vector=None, predicted_solution=None,
-	             last_solution=None, step_size=None, **_):
+	             last_solution=None, step_size=None, omega_scale: float = 1.0, **_):
 		self.predictor_vector = predictor_vector
 		self.predicted_solution = predicted_solution
 		self.last_solution = last_solution
 		self.step_size = step_size
+		self.omega_scale = omega_scale
 
 	def compute_parameterization(**kwargs):
 		pass
@@ -136,10 +137,14 @@ class OrthogonalParameterization(CorrectorParameterization):
 	g(x) = <predictor_vector, x - predicted_solution>
 	"""
 	def compute_parameterization(self, point, *args):
-		return vdot(self.predictor_vector, point - self.predicted_solution)
+		delta = point - self.predicted_solution
+		delta[-1] /= self.omega_scale ** 2  # omega measured as omega/omega_scale
+		return vdot(self.predictor_vector, delta)
 
 	def compute_jacobian_parameterization(self, *args):
-		return self.predictor_vector.T
+		row = self.predictor_vector.T.copy()  # copy: don't modify the tangent itself
+		row[:, -1] /= self.omega_scale ** 2
+		return row
 
 class ArcLengthParameterization(CorrectorParameterization):
 	"""
@@ -151,8 +156,11 @@ class ArcLengthParameterization(CorrectorParameterization):
 	"""
 	def compute_parameterization(self, point, *args):
 		delta = point - self.last_solution
-		return vdot(delta, delta) - self.step_size**2
+		weighted = delta.copy()
+		weighted[-1] /= self.omega_scale ** 2  # omega measured as omega/omega_scale
+		return vdot(delta, weighted) - self.step_size**2
 
 	def compute_jacobian_parameterization(self, point, *args):
 		delta = point - self.last_solution
+		delta[-1] /= self.omega_scale ** 2
 		return 2 * delta.T

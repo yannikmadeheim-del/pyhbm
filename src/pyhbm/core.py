@@ -124,6 +124,7 @@ class HarmonicBalanceMethod:
 		jacobian_update_frequency: int = 3,
 		jacobian_reuse_delta_threshold: float = 1e-3,
 		maximum_predictor_corrector_loops_per_solution: int = 10,
+		omega_scale: float = 1.0,
 		verbose: bool = True
 	) -> SolutionSet:
 
@@ -141,6 +142,14 @@ class HarmonicBalanceMethod:
 			jacobian_update_frequency = jacobian_update_frequency,
 			jacobian_reuse_delta_threshold = jacobian_reuse_delta_threshold,
 		)
+
+		if omega_scale != 1.0:
+			# step lengths are given in rad/s; convert them to the scaled metric
+			step_length_adaptation_kwargs = dict(step_length_adaptation_kwargs)  # don't mutate the caller's dict
+			step_length_adaptation_kwargs["maximum_step_length"] /= omega_scale
+			step_length_adaptation_kwargs["minimum_step_length"] /= omega_scale
+			if step_length_adaptation_kwargs.get("initial_step_length") is not None:
+				step_length_adaptation_kwargs["initial_step_length"] /= omega_scale
 
 		step_length_adaptation = self.step_length_adaptation(**step_length_adaptation_kwargs)
    
@@ -179,6 +188,14 @@ class HarmonicBalanceMethod:
 				print("Total solving time:", time()-t0, "seconds")
 				return solution_set
 
+			if omega_scale != 1.0:
+				# renormalize the unit tangent so its omega entry counts as
+				# omega/omega_scale: frequency and amplitude motion then contribute
+				# comparably to the step length. omega itself stays physical rad/s.
+				weighted = predictor_vector.copy()
+				weighted[-1] /= omega_scale
+				predictor_vector = predictor_vector / norm(weighted)
+
 			count_min_step_length = 1 if step_length_adaptation.step_length == step_length_adaptation.min_step_length else 0
    
 			for __ in range(maximum_predictor_corrector_loops_per_solution):
@@ -190,6 +207,7 @@ class HarmonicBalanceMethod:
 					predicted_solution=asarray(predicted_solution),
 					last_solution=asarray(previous_solution),
 					step_size=step_length_adaptation.step_length,
+					omega_scale=omega_scale,
 				)
 
 				solution, iterations, success, jacobian = solver.solve(predicted_solution, return_jacobian=True)
@@ -210,9 +228,10 @@ class HarmonicBalanceMethod:
 
 			solution_set.append(solution, iterations, step_length_adaptation.step_length)
 
-			progress = max(\
-        			(solution.omega-angular_frequency_range[0])/(angular_frequency_range[-1]-angular_frequency_range[0]), \
-				solution_number/maximum_number_of_solutions)
+			# progress = max(\
+        	# 		(solution.omega-angular_frequency_range[0])/(angular_frequency_range[-1]-angular_frequency_range[0]), \
+			# 	solution_number/maximum_number_of_solutions)
+			progress = (solution.omega-angular_frequency_range[0])/(angular_frequency_range[-1]-angular_frequency_range[0])
 
 			if verbose:
 				print("progress {:.3f} %".format(100*progress), f"\titerations {iterations}", "\tΔω {:.2e}".format(predictor_vector[-1,0]), end="\r")

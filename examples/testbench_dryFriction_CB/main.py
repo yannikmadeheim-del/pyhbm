@@ -1,27 +1,33 @@
 """
-Minimal reference for the pyFBS testbench_cubicSpring example:
-RBE2 / RBE3 interface + Craig-Bampton reduction + pyhbm second-order HBM.
+Craig-Bampton counterpart of the pyFBS testbench_dry_friction example:
+RBE2 / RBE3 interface + Craig-Bampton reduction + pyhbm second-order HBM, with
+the SAME dry-friction joint, FE model, excitation (impact H28, F0) and output
+channel (A_S1X) as the pyFBS FBS solve -- so both branches solve one problem by
+two routes and can be overlaid.
 
 For each condensation method in CONDENSATION_METHODS the coupled reduced system
-is assembled and swept with the HBM continuation. The solution branch is
-exported to one CSV per method (reference_<method>_cb_hbm.csv) in PHYSICAL
-coordinates: per continuation point omega, the corrector diagnostics and, for
-every harmonic, the complex amplitudes of every pyFBS response channel and the
-drive-point displacement (inverse Craig-Bampton through [Psi | Phi]), the
-6-DoF virtual-point motion of each substructure and the physical interface
-node displacements (inverse RBE2 u_Gamma = T_b q_m, resp. the retained RBE3
-interface DoFs) -- see physical_recovery / save_physical_solution. The comment
-header and the column names make the file self-contained: both plotted curves
-and the physical solution at every frequency point can be recovered from the
-CSV alone.
-For a quick look the output DoF response is also plotted (not saved).
+is assembled and swept with the HBM continuation. The branch is exported to one
+CSV per method (reference_<method>_cb_dryfriction_hbm.csv) in PHYSICAL
+coordinates, in exactly the convention of the pyFBS export: per continuation
+point omega, the corrector diagnostics and, for every harmonic, the complex
+amplitudes of every pyFBS response channel and the drive-point displacement
+(inverse Craig-Bampton through [Psi | Phi]), the 6-DoF virtual-point motion of
+each substructure and the physical interface node displacements. The CSVs drop
+straight into the pyFBS example's plot_diagnostics_comparison.py next to
+reference_modal_fbs_hbm.csv (it reads the gap as A_vp_* - B_vp_* and the output
+channel as A_S1X). The forced response is also plotted here (not saved).
+
+Runtime: with HARMONICS 1..19 and POLY_DEG = 52 the AFT sampling is N_t = 1008
+like pyFBS, which makes the per-Newton-step Jacobian array (N_t, d, d) -- about
+150 MB for RBE2 (d = 135) and 340 MB for RBE3 (d = 204), plus its FFT. A full
+sweep is an overnight run; POLY_DEG, N_MODES and CONDENSATION_METHODS are the
+knobs, and lowering them does not change the exported format.
 """
 
 import sys
 import time
 from pathlib import Path
 
-from pyhbm import OrthogonalParameterization
 from pyhbm.numerical_continuation.corrector_step import ArcLengthParameterization
 from pyhbm.numerical_continuation.predictor_step import TangentPredictorBordered
 
@@ -33,7 +39,7 @@ except (AttributeError, ValueError):
 
 import numpy as np
 
-from dynamical_system import (CoupledCubicCB, ReducedSubstructure,
+from dynamical_system import (CB_DIR, CoupledDryFrictionCB, ReducedSubstructure,
                               assemble_coupled, channel_header_lines,
                               channel_snap_info, get_boundary_nodes,
                               load_or_export, nearest_node,
@@ -42,28 +48,24 @@ from dynamical_system import (CoupledCubicCB, ReducedSubstructure,
                               save_physical_solution)
 
 # ---------------------------------------------------------------------------
-# Paths -- lab_testbench is a local copy of the pyFBS example data (FEM, STL,
-# Measurements).
+# Paths -- FE data, workbook, npz cache and descriptor are the sibling cubic-
+# spring example's copy of the pyFBS lab_testbench data (see dynamical_system).
 # ---------------------------------------------------------------------------
 HERE = Path(__file__).resolve().parent
-FEM_DIR = HERE / "lab_testbench" / "FEM"
-XLSX_PATH = HERE / "lab_testbench" / "Measurements" / "coupling_example.xlsx"
+FEM_DIR = CB_DIR / "lab_testbench" / "FEM"
+XLSX_PATH = CB_DIR / "lab_testbench" / "Measurements" / "coupling_example.xlsx"
 
 # ---------------------------------------------------------------------------
-# Joint / interface / I/O definition -- exported from the pyFBS example, so
-# pyFBS's VPT is the single source of truth.
+# Interface / I/O definition -- exported from the pyFBS example, so pyFBS's VPT
+# is the single source of truth. Its "joint" entry (cubic spring) is unused
+# here; the dry-friction parameters below replace it.
 # ---------------------------------------------------------------------------
-DESCRIPTOR = read_descriptor(HERE / "substructure_descriptor.json")
+DESCRIPTOR = read_descriptor(CB_DIR / "substructure_descriptor.json")
 
 VP_XYZ = np.array(DESCRIPTOR["vp"]["position"])  # (0.038895, 0.348107, 0.007)
 
-K_DIAG     = np.array(DESCRIPTOR["joint"]["k_diag"])      # [N/m x3, Nm/rad x3]
-C_DIAG     = np.array(DESCRIPTOR["joint"]["c_diag"])      # linear viscous damper [N s/m x3, Nm s/rad x3]
-ALPHA_DIAG = np.array(DESCRIPTOR["joint"]["alpha_diag"])  # cubic stiffness
-BETA_DIAG  = np.array(DESCRIPTOR["joint"]["beta_diag"])   # cubic damping
-
-# excitation: F0*cos(w t) at impact H28 on B (first B reference impact)
-F0      = DESCRIPTOR["excitation"]["F0"]                  # [N]
+# excitation: F0*cos(w t) at impact H28 on B (first B reference impact = the
+# DoF pyFBS excites); F0 from the pyFBS dry-friction main, not the descriptor.
 INP_POS = np.array(DESCRIPTOR["excitation"]["position"])
 INP_DIR = np.array(DESCRIPTOR["excitation"]["direction"])
 
@@ -72,54 +74,79 @@ OUT_POS = np.array(DESCRIPTOR["output"]["position"])
 OUT_DIR = np.array(DESCRIPTOR["output"]["direction"])
 
 # ---------------------------------------------------------------------------
+# Joint parameters -- copied from the pyFBS testbench_dry_friction main.
+#   MU_TRANS : friction coefficient [-]
+#   N_CLAMP  : bolt clamping force [N]; both clamp faces carry MU_TRANS*N_CLAMP,
+#              so the x-y friction force saturates at 2*MU_TRANS*N_CLAMP
+#   K_TRANS  : penalty stiffness [N/m] tying the normal (z) interface gap
+#   G        : effective contact radius [m] of the torsional friction; the spin
+#              moment saturates at 2*MU_TRANS*N_CLAMP*G
+#   K_ROT    : rotational penalty stiffness [Nm/rad] tying the tilt gap rx, ry
+#   ALPHA    : tanh regularization sharpness [s/m]; near sticking the joint acts
+#              like a viscous damper c_eff = 2*MU_TRANS*N_CLAMP*ALPHA
+#   F0       : harmonic excitation amplitude [N]
+# ---------------------------------------------------------------------------
+MU_TRANS = 0.3
+N_CLAMP = 200.0
+K_TRANS = 1.0e8
+G = 0.00
+K_ROT = 0
+ALPHA = 1.0e3
+F0 = 1000.0
+
+# ---------------------------------------------------------------------------
 # Solver / reduction parameters
 # ---------------------------------------------------------------------------
-HARMONICS = [1, 3, 5, 7]                         # cubic forcing -> odd harmonics
-F_LO, F_HI = 200, 500                        # continuation window [Hz]
-ZETA = 0.005                                     # modal damping per substructure
-N_MODES = 20                                     # fixed-interface modes per substructure
+HARMONICS = list(range(1, 20, 2))   # friction force is odd in v -> odd harmonics
+POLY_DEG = 10                       # AFT sampling: N_t = (POLY_DEG+1)*19+1 = 1008
+F_LO, F_HI = 40.0, 500          # continuation window [Hz]
+ZETA = 0.005                        # modal damping per substructure
+N_MODES = 60                        # fixed-interface modes per substructure
 
 # interface condensation -- run any subset (both by default):
 #   "rbe2" -- rigid MPC, interface condensed to the 6-DoF VP (stiffens the joint)
 #   "rbe3" -- interpolation MPC, interface kept flexible, VP by weighted average
-CONDENSATION_METHODS = ("rbe3",)
-RBE3_WEIGHTS = None                              # None -> uniform; see rbe3_vp_operator
+CONDENSATION_METHODS = ("rbe2", "rbe3")
+RBE3_WEIGHTS = None                 # None -> uniform; see rbe3_vp_operator
 
-# interface (RBE2 slave) definition -- see get_boundary_nodes:
-#   "descriptor": the exact nodes pyFBS's VPT uses, from the exported JSON (default)
+# interface (RBE2 slave) definition: "descriptor" = the exact nodes pyFBS's VPT
+# uses, from the exported JSON (see get_boundary_nodes for the alternatives)
 INTERFACE_METHOD = "descriptor"
-IFACE_A_TXT = FEM_DIR / "IFACE_A.txt"
-IFACE_B_TXT = FEM_DIR / "IFACE_B.txt"
-MATING_TOL = 1e-6                                # coincidence tolerance [m]
 
 
 def run_hbm(system):
     """
     Multiharmonic balance + arc-length continuation of the coupled system,
-    swept downward from F_HI to F_LO like the pyFBS example (cold zero start
-    at the top of the window, reference direction pointing to lower omega).
+    swept downward from F_HI to F_LO like the pyFBS example (cold zero start at
+    the top of the window, reference direction pointing to lower omega). The
+    continuation settings are the pyFBS dry-friction ones -- in particular the
+    Jacobian is rebuilt every iteration, because the friction Jacobian changes
+    with the sliding state.
     """
     from pyhbm import FourierOmegaPoint, HarmonicBalanceMethod
 
-    solver = HarmonicBalanceMethod(harmonics=HARMONICS, second_order_ode=system, corrector_parameterization=OrthogonalParameterization, predictor=TangentPredictorBordered)
+    solver = HarmonicBalanceMethod(
+        harmonics=HARMONICS, second_order_ode=system,
+        corrector_parameterization=ArcLengthParameterization,
+        predictor=TangentPredictorBordered)
     w_lo, w_hi = 2.0 * np.pi * F_LO, 2.0 * np.pi * F_HI
-    ig = FourierOmegaPoint.zero_amplitude(dimension=system.dimension, omega=300*2*np.pi)
+    ig = FourierOmegaPoint.zero_amplitude(dimension=system.dimension, omega=w_hi)
     rd = FourierOmegaPoint.new_from_first_harmonic(
         np.zeros((system.dimension, 1), dtype=complex), omega=-1.0)
 
     return solver.solve_and_continue(
         initial_guess=ig,
         initial_reference_direction=rd,
-        maximum_number_of_solutions= 10000,
+        maximum_number_of_solutions=5000,
         angular_frequency_range=[w_lo, w_hi],
-        solver_kwargs={"maximum_iterations": 300,
+        solver_kwargs={"maximum_iterations": 500,
                        "absolute_tolerance": 1e-6},
-        omega_scale= 1e4,
+        omega_scale=1,
         step_length_adaptation_kwargs={"base": 3.0,
                                        "initial_step_length": 0.01 * 2 * np.pi,
-                                       "maximum_step_length": 0.1 * 2 * np.pi,
-                                       "minimum_step_length": 1e-7,
-                                       "goal_number_of_iterations": 3},
+                                       "maximum_step_length": 1.0 * 2 * np.pi,
+                                       "minimum_step_length": 1e-6,
+                                       "goal_number_of_iterations": 8},
         jacobian_update_frequency=1,
         verbose=True,
     )
@@ -130,7 +157,8 @@ def export_header(method, solve_time, n_points, iface, channels, out_label,
     """
     Comment header that makes the CSV self-contained: run metadata, the exact
     time-reconstruction formula and units, the meaning of every column family,
-    and the id/position of every exported physical DoF.
+    and the id/position of every exported physical DoF. The joint lines are
+    worded like the pyFBS export so both references document the same law.
 
     :param iface: {"A": (ansys_ids, xyz (nb,3)), "B": ...} interface node info
     :param channels: {"A": channel_snap_info(...), "B": ...}
@@ -147,12 +175,19 @@ def export_header(method, solve_time, n_points, iface, channels, out_label,
                      "= CB boundary block, no expansion needed")
     in_id, in_xyz = in_node
     lines = [
-        f"testbench_cubicSpring_CB physical forced-response reference -- "
+        f"testbench_dryFriction_CB physical forced-response reference -- "
         f"{method.upper()} interface + Craig-Bampton "
         f"({N_MODES} fixed-interface modes/substructure, zeta = {ZETA})",
         f"solve_time_s: {solve_time:.6f}",
         f"n_points: {n_points}",
         f"harmonics: {list(HARMONICS)}",
+        f"joint friction: mu_trans = {MU_TRANS}, clamping force N = {N_CLAMP} N,"
+        f" slip force 2*mu_trans*N = {2.0 * MU_TRANS * N_CLAMP} N,"
+        f" alpha = {ALPHA} s/m",
+        f"joint torsional friction (rz): geometry factor G = {G} m,"
+        f" slip moment 2*mu_trans*N*G = {2.0 * MU_TRANS * N_CLAMP * G} Nm",
+        f"joint penalty stiffness: k_trans (z) = {K_TRANS} N/m,"
+        f" k_rot (rx, ry) = {K_ROT} Nm/rad",
         f"excitation: f(t) = F0 cos(omega t) at 'uin', F0 = {F0} N",
         "content: complex harmonic amplitudes a_h = re_h<h>_<dof> + 1j im_h<h>_<dof>"
         " of the PHYSICAL solution -- the reduced (Craig-Bampton) solver"
@@ -160,19 +195,17 @@ def export_header(method, solve_time, n_points, iface, channels, out_label,
         "  uin and the A_/B_ sensor channels: displacement recovered through"
         " the CB basis [Psi | Phi] (inverse Craig-Bampton) at the snapped FE"
         " nodes listed below",
-        f"  A_vp_* / B_vp_*: 6-DoF virtual-point motion, {vp_txt}",
+        f"  A_vp_* / B_vp_*: 6-DoF virtual-point motion, {vp_txt}; the joint"
+        " gap is x = A_vp - B_vp and the joint force is"
+        " f_T = 2*mu_trans*N*tanh(alpha*||v_T||)*v_T/||v_T|| on the [ux, uy]"
+        " gap velocity, f_z = k_trans*x on uz, M_rxy = k_rot*x on rx/ry and"
+        " M_rz = 2*mu_trans*N*G*tanh(alpha*G*xdot) on rz",
         f"  A_n<id>_u* / B_n<id>_u*: interface node displacements, {iface_txt}",
         "  (modal coordinates eta are not exported; responses at other internal"
         " nodes need a rerun)",
         "reconstruction: u(t) = Re( sum_h a_h exp(1j h omega t) );  velocity:"
         " udot(t) = Re( sum_h 1j h omega a_h exp(1j h omega t) );  channel"
         " acceleration: acc_h = -(h omega)^2 a_h",
-        "joint: x = A_vp - B_vp (6 relative VP DoFs); f_joint = K_DIAG x"
-        " + C_DIAG xdot + ALPHA_DIAG x^3 + BETA_DIAG xdot^3 (per-DoF diagonals)",
-        f"joint stiffness k_diag [N/m x3, Nm/rad x3]: {K_DIAG.tolist()}",
-        f"joint viscous damping c_diag [N s/m x3, Nm s/rad x3]: {C_DIAG.tolist()}",
-        f"joint cubic alpha_diag: {ALPHA_DIAG.tolist()}",
-        f"joint cubic beta_diag: {BETA_DIAG.tolist()}",
         "units: displacement amplitudes m, vp rotations rad, freq_hz Hz,"
         " omega_rad_s rad/s",
         f"columns: freq_hz, omega_rad_s | iterations, step_length (corrector"
@@ -198,12 +231,11 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     print(f"FEM data: {FEM_DIR}")
-    substructures = {name: load_or_export(name, FEM_DIR, HERE)
+    substructures = {name: load_or_export(name, FEM_DIR, CB_DIR)
                      for name in ("A", "B")}
     idx_A, idx_B = get_boundary_nodes(
         INTERFACE_METHOD, substructures["A"], substructures["B"],
-        xlsx_path=XLSX_PATH, tol=MATING_TOL,
-        file_A=IFACE_A_TXT, file_B=IFACE_B_TXT, descriptor=DESCRIPTOR)
+        xlsx_path=XLSX_PATH, descriptor=DESCRIPTOR)
 
     # retain the excitation node as a CB attachment DoF (static completeness of
     # the applied load). The measurement node stays interior -- it carries no
@@ -233,8 +265,8 @@ if __name__ == "__main__":
         M, C, K, Bc = assemble_coupled(sub_A, sub_B)
         f_r = np.concatenate([np.zeros(sub_A.M_r.shape[0]),
                               sub_B.recovery_row(INP_POS, INP_DIR)])
-        system = CoupledCubicCB(M, C, K, Bc, K_DIAG, C_DIAG,
-                                ALPHA_DIAG, BETA_DIAG, f_r, F0)
+        system = CoupledDryFrictionCB(M, C, K, Bc, f_r, F0, MU_TRANS, N_CLAMP,
+                                      ALPHA, K_TRANS, K_ROT, G, POLY_DEG)
 
         t0 = time.perf_counter()
         solution_set = run_hbm(system)
@@ -251,7 +283,8 @@ if __name__ == "__main__":
             channels=chan_info, out_label=out_label,
             in_node=nearest_node(substructures["B"], INP_POS))
         freq, abs_h1, max_time = save_physical_solution(
-            solution_set, solve_time, HERE / f"reference_{method}_cb_hbm.csv",
+            solution_set, solve_time,
+            HERE / f"reference_{method}_cb_dryfriction_hbm.csv",
             labels, T, header, out_label)
 
         ax_max.semilogy(freq, max_time, "-", color=colors.get(method), lw=1.2,
@@ -260,7 +293,8 @@ if __name__ == "__main__":
                        label=f"{method.upper()} |1st harmonic amplitude|")
 
     ax_max.set_ylabel(f"max|{out_label}(t)|  [m]")
-    ax_max.set_title("Cubic-spring testbench: RBE2 vs RBE3 forced response")
+    ax_max.set_title(f"Dry-friction testbench: RBE2 vs RBE3 forced response "
+                     f"(mu = {MU_TRANS:g}, N = {N_CLAMP:g} N, F0 = {F0:g} N)")
     ax_max.grid(True, which="both", alpha=0.3)
     ax_max.legend()
 
