@@ -1,0 +1,5 @@
+# Solver output: one physical-solution CSV per run, tens of MB each and fully
+# regenerable from the config_json header line every one of them carries.
+# Comparison folders assembled by hand live here too, together with their
+# plot_styles.csv -- copy the CSVs to compare between machines, not through git.
+results/
