@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 
 import plotting
 
-COMPARE_DIR = "results/joint_vs_condensation"   # folder name inside this example folder
+COMPARE_DIR = "results/cubic_vs_amplitude_condensation"   # folder inside this example
 STYLE_FILE  = "plot_styles.csv"       # style spec inside that folder
 XLIM        = (200, 500)              # displayed frequency range [Hz]
 
