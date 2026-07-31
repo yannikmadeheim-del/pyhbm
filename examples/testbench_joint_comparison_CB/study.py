@@ -55,7 +55,7 @@ BASE = dict(
     joints = [],                   # filled per run from JOINT_SETS
     F0 = 200.0, modal_damping = 0.005,
     solver = "pyhbm-cb",
-    condensation = "rbe3", n_modes = 20,
+    condensation = "RBE_average", n_modes = 20,
     interface_method = "descriptor", rbe3_weights = None,
     harmonics = [1, 3, 5], polynomial_degree = 3,
     f_lo = 200.0, f_hi = 500.0, sweep = "down",
@@ -79,7 +79,10 @@ JOINT_SETS = [
      dict(type="cubic",  alpha=[0.0, 1.0e8], dofs=ALL6)],
 ]
 
-GLOBAL_SWEEP = dict(condensation=["rbe2", "rbe3", "RBE_rigid", "RBE_average"])
+# The directional condensations take their boundary from the workbook VPT rows,
+# so they IGNORE ``interface_method`` and ``rbe3_weights``: sweeping either of
+# those alongside them only produces duplicate runs.
+GLOBAL_SWEEP = dict(condensation=["RBE_average", "RBE_rigid"])
 # ---------------------------------------------------------------------------
 
 SWEEP_EXEMPT = ("dofs", "spin_dof")   # tuples/strings, not sweepable value lists
