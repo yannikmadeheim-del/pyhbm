@@ -76,7 +76,7 @@ OUT_DIR = np.array(DESCRIPTOR["output"]["direction"])
 # Solver / reduction parameters
 # ---------------------------------------------------------------------------
 HARMONICS = [1, 3, 5, 7]                         # cubic forcing -> odd harmonics
-F_LO, F_HI = 200, 500                        # continuation window [Hz]
+F_LO, F_HI = 1, 500                        # continuation window [Hz]
 ZETA = 0.005                                     # modal damping per substructure
 N_MODES = 20                                     # fixed-interface modes per substructure
 
@@ -87,7 +87,7 @@ N_MODES = 20                                     # fixed-interface modes per sub
 #   "rbe3"        -- interpolation MPC, interface flexible, VP by weighted average
 #   "RBE_rigid"   -- rigid MPC on the VPT DoFs only
 #   "RBE_average" -- VP observed/loaded through pyFBS's Tu / Tf
-CONDENSATION_METHODS = ("rbe3",)
+CONDENSATION_METHODS = ("RBE_rigid", "RBE_average")
 RBE3_WEIGHTS = None                              # None -> uniform; see rbe3_vp_operator
 VPT_WU = VPT_WF = None                           # RBE_average weighting; None -> identity
 
@@ -122,13 +122,13 @@ def run_hbm(system):
         maximum_number_of_solutions= 10000,
         angular_frequency_range=[w_lo, w_hi],
         solver_kwargs={"maximum_iterations": 300,
-                       "absolute_tolerance": 1e-6},
-        omega_scale= 1e4,
-        step_length_adaptation_kwargs={"base": 1.5,
-                                       "initial_step_length": 0.1 * 2 * np.pi,
-                                       "maximum_step_length": 1.0 * 2 * np.pi,
+                       "absolute_tolerance": F0*1e-6},
+        omega_scale= 1,
+        step_length_adaptation_kwargs={"base": 2,
+                                       "initial_step_length": 0.1,
+                                       "maximum_step_length": 1.0,
                                        "minimum_step_length": 1e-4,
-                                       "goal_number_of_iterations": 3},
+                                       "goal_number_of_iterations": 2},
         jacobian_update_frequency=1,
         verbose=True,
     )
