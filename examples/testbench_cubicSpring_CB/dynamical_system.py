@@ -413,6 +413,297 @@ def rbe3_vp_operator(nodes, boundary_idx, master_xyz, weights=None):
     return np.linalg.solve(D.T @ WD, WD.T)        # (D^T W D)^-1 D^T W  = G^T
 
 
+# ===========================================================================
+# Directional (pyFBS-VPT) interface -- the DoF set behind the RBE_rigid and
+# RBE_average condensations.
+#
+# pyFBS's virtual point transformation never sees a whole node: every workbook
+# row contributes ONE scalar DoF, the response (or force) along that row's own
+# direction, at the FE node its position snaps to. A triaxial sensor supplies
+# three rows and so happens to span its node completely; a single impact
+# supplies one and leaves the other two directions of that node untouched.
+# These helpers reproduce that DoF set exactly, in contrast to the full
+# 3-DoF-per-node idealisation the "rbe2"/"rbe3" condensations use.
+# ===========================================================================
+
+VPT_GROUPING = 10                # workbook Grouping id of the virtual-point interface
+
+
+def read_vpt_rows(xlsx_path, substructure, nodes, grouping=VPT_GROUPING):
+    """
+    The interface rows pyFBS's VPT actually uses, snapped to the FE mesh.
+
+    Reads the ``grouping`` rows of Channels_<substructure> / Impacts_<substructure>
+    and snaps each position to the nearest FE node -- the same rule as pyfbs
+    Model.find_nearest_locations, verified to select the identical nodes.
+
+    :param nodes: (n, 3) node coordinates of ONE substructure [m]
+    :return: dict(channels=[...], impacts=[...]), each a list of
+        (name, node index, direction (3,)) in WORKBOOK ROW ORDER. The order is
+        what makes Ru/Rf comparable to vpt.ru/vpt.rf row by row.
+    """
+    import pandas as pd
+
+    out = {}
+    for kind, sheet in (("channels", "Channels"), ("impacts", "Impacts")):
+        df = pd.read_excel(xlsx_path, sheet_name=f"{sheet}_{substructure}")
+        rows = []
+        for _, r in df[df["Grouping"] == grouping].iterrows():
+            pos = r[["Position_1", "Position_2", "Position_3"]].to_numpy(float)
+            dvec = r[["Direction_1", "Direction_2", "Direction_3"]].to_numpy(float)
+            j = int(np.argmin(np.linalg.norm(nodes - pos, axis=1)))
+            rows.append((str(r["Name"]), j, dvec))
+        assert rows, f"no Grouping=={grouping} rows in {sheet}_{substructure}"
+        out[kind] = rows
+    return out
+
+
+def check_vpt_rows(vpt_rows, descriptor, substructure, nnum):
+    """
+    Guard against the two-workbook-copies hazard.
+
+    The descriptor is written by pyFBS from ITS copy of coupling_example.xlsx;
+    ``vpt_rows`` come from the copy next to this example. Editing one and not the
+    other -- or forgetting to re-run export_substructure_descriptor.py -- would
+    leave the two pipelines silently describing different interfaces, so compare
+    them row by row. Skipped for descriptors written before these fields existed.
+    """
+    sub = descriptor["substructures"][substructure]
+    for kind in ("channels", "impacts"):
+        ref = sub.get(f"interface_{kind}")
+        if ref is None:
+            continue
+        got = vpt_rows[kind]
+        hint = ("descriptor and the local coupling_example.xlsx disagree -- re-run "
+                "export_substructure_descriptor.py, or the two workbook copies "
+                "have drifted apart")
+        assert len(ref) == len(got), \
+            f"[{substructure}] {kind}: {len(ref)} rows in descriptor vs {len(got)} local -- {hint}"
+        for k, (exp, (name, j, dvec)) in enumerate(zip(ref, got)):
+            assert int(exp["node_id"]) == int(nnum[j]), \
+                (f"[{substructure}] {kind} row {k} ({name}): descriptor node "
+                 f"{exp['node_id']} vs local {int(nnum[j])} -- {hint}")
+            assert np.allclose(exp["direction"], dvec, atol=1e-9), \
+                f"[{substructure}] {kind} row {k} ({name}): direction differs -- {hint}"
+
+
+def direction_basis(directions, tol=1e-8):
+    """
+    Split one node's 3D space into the directions the workbook names and the rest.
+
+    The SVD is not cosmetic: once Channels_<X> and Impacts_<X> are made identical
+    (so that Tu == Tf.T), every interface node carries DUPLICATED directions --
+    an impact row and its mirrored channel row point the same way -- so the raw
+    stack is rank deficient and could not be completed to a basis directly. The
+    rank detection below handles that as a matter of course.
+
+    :param directions: (m, 3) unit directions named at this node -- three for a
+        triax, one for a single impact, with duplicates allowed.
+    :return: (C, N) with C (k, 3) an ORTHONORMAL basis of their span (k = rank)
+        and N (3-k, 3) its orthonormal complement, so vstack([C, N]) is a
+        rotation. In that frame the k constrained coordinates can be retained as
+        Craig-Bampton boundary DoFs while the remaining 3-k stay interior.
+    """
+    _, s, Vt = np.linalg.svd(np.atleast_2d(directions))
+    k = int(np.count_nonzero(s > tol * max(1.0, s[0])))
+    return Vt[:k], Vt[k:]
+
+
+@dataclass
+class DirectionalBoundary:
+    """
+    The (constrained | free) split of every retained node, and the layout of the
+    resulting boundary vector ``a``. ``interface_mask`` marks which boundary DoFs
+    belong to the joint interface -- the excitation/output DoFs are retained for
+    static completeness but must NOT enter the virtual-point map.
+    """
+    node_idx: np.ndarray               # (nb,) retained node indices, ascending
+    C: dict                            # node index -> (k_j, 3) constrained basis
+    N: dict                            # node index -> (3-k_j, 3) complement
+    slot: dict                         # node index -> slice into ``a``
+    n_boundary: int                    # sum of k_j over retained nodes
+    interface_mask: np.ndarray         # (n_boundary,) bool
+    b_idx: np.ndarray                  # (n_boundary,) boundary DoFs, ROTATED global index
+    i_idx: np.ndarray                  # (n_dof - n_boundary,) interior DoFs, ditto
+
+    def basis(self, node):
+        return self.C[int(node)]
+
+    def free_slot(self, node):
+        """Positions of node ``node``'s free (complement) coordinates within the
+        INTERIOR vector -- what :func:`ReducedSubstructure.recovery_row` needs to
+        pick the Psi/Phi rows of a partially constrained node."""
+        j, k = int(node), self.C[int(node)].shape[0]
+        return np.searchsorted(self.i_idx, 3 * j + np.arange(k, 3))
+
+
+def build_directional_boundary(interface_rows, io_rows, n_nodes):
+    """
+    Assemble the directional boundary from the workbook rows.
+
+    :param interface_rows: (name, node, direction) of every joint-interface row
+        -- the UNION of the channel and impact rows, so the boundary set does not
+        change when the two sheets are later made identical.
+    :param io_rows: same tuples for the excitation / output DoFs; retained so
+        their static response is exact, but excluded from the VP map.
+    :param n_nodes: total node count of the substructure (sets the interior set)
+    :return: :class:`DirectionalBoundary`
+    """
+    per_node, iface_nodes = {}, set()
+    for rows, is_iface in ((interface_rows, True), (io_rows, False)):
+        for _, j, dvec in rows:
+            per_node.setdefault(int(j), []).append(dvec)
+            if is_iface:
+                iface_nodes.add(int(j))
+
+    node_idx = np.array(sorted(per_node), dtype=int)
+    C, N, slot, mask, b_idx, off = {}, {}, {}, [], [], 0
+    for j in node_idx:
+        C[int(j)], N[int(j)] = direction_basis(np.vstack(per_node[int(j)]))
+        k = C[int(j)].shape[0]
+        slot[int(j)] = slice(off, off + k)
+        mask.append(np.full(k, int(j) in iface_nodes))
+        b_idx.append(3 * int(j) + np.arange(k))          # rotated-frame DoF index
+        off += k
+    b_idx = np.concatenate(b_idx)
+    return DirectionalBoundary(
+        node_idx=node_idx, C=C, N=N, slot=slot, n_boundary=off,
+        interface_mask=np.concatenate(mask), b_idx=b_idx,
+        i_idx=np.setdiff1d(np.arange(3 * n_nodes), b_idx))
+
+
+def rotate_and_partition(K, M, boundary):
+    """
+    Rotate every retained node into its (constrained | free) frame and return the
+    boundary-first blocks in the same dict layout as :func:`apply_rbe2` /
+    :func:`partition_blocks`, so :func:`craig_bampton` is shared by all four
+    condensations.
+
+    The rotation u_j = Q_j^T [a_j; b_j] with Q_j = [C_j; N_j] is orthogonal, so
+    it is exact and does not touch conditioning; only the constrained
+    coordinates a_j become boundary DoFs, the free b_j join the interior.
+    """
+    n_dof = K.shape[0]
+    T = sparse.eye(n_dof, format="lil")
+    for j in boundary.node_idx:
+        Q = np.vstack([boundary.C[int(j)], boundary.N[int(j)]])   # (3, 3) rotation
+        T[3 * j:3 * j + 3, 3 * j:3 * j + 3] = Q.T
+    T = T.tocsr()
+
+    perm = np.concatenate([boundary.b_idx, boundary.i_idx])
+    nb = boundary.n_boundary
+
+    def blocks(A):
+        A_z = (T.T @ A @ T).tocsr()[perm][:, perm]
+        return A_z[:nb, :nb].toarray(), A_z[:nb, nb:].toarray(), A_z[nb:, nb:].tocsc()
+
+    K_bb, K_bi, K_ii = blocks(K)
+    M_bb, M_bi, M_ii = blocks(M)
+    return dict(K_bb=K_bb, K_bi=K_bi, K_ii=K_ii,
+                M_bb=M_bb, M_bi=M_bi, M_ii=M_ii)
+
+
+def vpt_selection(rows, boundary):
+    """
+    (n_rows, n_boundary) map from the boundary coordinates ``a`` to the scalar
+    channel / impact amplitudes: the amplitude of row (node j, direction d) is
+    d.u_j = (C_j d).a_j, because d lies in the span of C_j by construction.
+    Every other entry is exactly zero -- that is what makes this reduction
+    faithful to the VPT rather than an approximation of it, so it is asserted.
+    """
+    S = np.zeros((len(rows), boundary.n_boundary))
+    for r, (name, j, dvec) in enumerate(rows):
+        C = boundary.basis(j)
+        residual = np.linalg.norm(dvec - C.T @ (C @ dvec))
+        assert residual < 1e-10, (
+            f"row {name!r}: direction is not in the retained span of node {j} "
+            f"(residual {residual:g}) -- the boundary is missing this direction")
+        S[r, boundary.slot[int(j)]] = C @ dvec
+    return S
+
+
+def vpt_idm(nodes, rows, master_xyz):
+    """
+    pyFBS's Ru / Rf: one row per workbook row, ``direction @ [I3 | -skew(r)]``
+    with r the lever arm from the virtual point to the snapped node. Built on
+    :func:`rbe2_transformation`, which is elementwise identical to vpt.py's
+    r_matrix_u block (and its transpose is the r_matrix_f block).
+    """
+    return np.vstack([dvec @ rbe2_transformation(nodes, [j], master_xyz)
+                      for _, j, dvec in rows])
+
+
+def vpt_transformations(Ru, Rf, wu=None, wf=None):
+    """
+    Tu and Tf exactly as pyfbs/interface/vpt.py builds them (define_idm_u /
+    define_idm_f), pinv included so the degenerate cases behave identically.
+
+    ``wu`` and ``wf`` stay INDEPENDENT here, as they are in pyFBS. The single
+    ``weights`` argument of :func:`rbe3_vp_operator` cannot be reused: it plays
+    the role of wu and of wf^-1 at once, which forces Tf == Tu.T and is exactly
+    the reciprocity the VPT does not have.
+
+    :return: (Tu (6, n_chn), Tf (n_imp, 6))
+    """
+    Wu = np.eye(Ru.shape[0]) if wu is None else np.asarray(wu, dtype=float)
+    Wf = np.eye(Rf.shape[0]) if wf is None else np.asarray(wf, dtype=float)
+    Tu = np.linalg.pinv(Ru.T @ Wu @ Ru) @ Ru.T @ Wu
+    Tf = np.linalg.pinv(Wf) @ Rf @ np.linalg.pinv(Rf.T @ np.linalg.pinv(Wf) @ Rf)
+    return Tu, Tf
+
+
+def condense_boundary(blocks, T_red):
+    """
+    Apply a boundary reduction a_b = T_red q_b to a partitioned block dict,
+    leaving the interior untouched. The RBE_rigid counterpart of the in-place
+    condensation :func:`apply_rbe2` performs, kept separate so the partition and
+    the constraint stay independent steps.
+    """
+    out = {}
+    for sym in ("K", "M"):
+        out[f"{sym}_bb"] = T_red.T @ blocks[f"{sym}_bb"] @ T_red
+        out[f"{sym}_bi"] = T_red.T @ blocks[f"{sym}_bi"]
+        out[f"{sym}_ii"] = blocks[f"{sym}_ii"]
+    return out
+
+
+def rigid_boundary_map(rows, boundary, R):
+    """
+    Reduction a_b = T_red [q_m; q_io] for RBE_rigid: the interface coordinates
+    follow the 6-DoF master rigidly, the excitation/output coordinates stay free.
+
+    The constraint is stated on the workbook rows, "the amplitude along row r
+    equals R[r] q_m", i.e. ``S_iface a_iface = R q_m``. Because the boundary
+    coordinates are the ROTATED node coordinates (see :func:`direction_basis`),
+    not the raw amplitudes, that has to be inverted rather than read off:
+
+        a_iface = pinv(S_iface) R q_m
+
+    ``pinv`` -- not ``solve`` -- because after the two sheets are unified every
+    direction appears twice, making ``S_iface`` overdetermined but consistent.
+    The consistency is asserted; a nonzero residual would mean the boundary
+    cannot represent the constraint and the reduction would be silently wrong.
+
+    :param rows: the union rows the interface boundary was built from
+    :param R: (n_rows, 6) their IDM, from :func:`vpt_idm`
+    :return: T_red (n_boundary, 6 + n_io)
+    """
+    iface = boundary.interface_mask
+    S_iface = vpt_selection(rows, boundary)[:, iface]
+    G = np.linalg.pinv(S_iface) @ R                     # (n_iface_boundary, 6)
+
+    residual = np.abs(S_iface @ G - R).max()
+    assert residual < 1e-9 * max(1.0, np.abs(R).max()), (
+        f"rigid constraint is not representable in the retained boundary "
+        f"(residual {residual:g}) -- a workbook direction is missing from it")
+
+    n_io = int(np.count_nonzero(~iface))
+    T_red = np.zeros((boundary.n_boundary, 6 + n_io))
+    T_red[iface, :6] = G
+    T_red[~iface, 6:] = np.eye(n_io)                    # I/O DoFs stay independent
+    return T_red
+
+
 def partition_blocks(K, M, perm, n_b):
     """Boundary-first partition WITHOUT condensation -- the RBE3 counterpart of
     :func:`apply_rbe2`. The interface DoFs stay the boundary set (RBE3 does not
@@ -524,12 +815,24 @@ def modal_damping_matrix(M_r, K_r, zeta, f_rbm_tol=1.0):
 
 @dataclass
 class ReducedSubstructure:
-    """One Craig-Bampton reduced substructure. Reduced coordinates q_r are
-    [q_m (6); eta] for RBE2 (rigid interface condensed to the VP) or
-    [q_Gamma (3nb); eta] for RBE3 (interface kept flexible); ``vp_operator`` maps
-    q_r to the 6 VP DoFs used for coupling."""
+    """One Craig-Bampton reduced substructure, in one of four condensations.
+
+    Whole-node boundary (all 3 translations of every interface node retained):
+      "rbe2"        rigid interface condensed to the 6-DoF VP; q_r = [q_m; eta]
+      "rbe3"        interface kept flexible; q_r = [q_Gamma (3nb); eta]
+
+    Directional boundary (only the DoFs the workbook names, plus excitation and
+    output -- see :func:`build_directional_boundary`):
+      "RBE_rigid"   those DoFs condensed rigidly to the VP; q_r = [q_m; q_io; eta]
+      "RBE_average" they stay free; q_r = [a (n_boundary); eta]
+
+    ``vp_operator`` observes the 6 VP DoFs from q_r and ``vp_load`` spreads a VP
+    wrench back onto it. They are transposes of one another in every mode EXCEPT
+    "RBE_average", where Tu and Tf are built from different workbook rows -- which
+    is precisely the asymmetry pyFBS's VPT has and the reciprocal RBE3 map has not.
+    """
     name: str
-    M_r: np.ndarray            # (nr, nr), nr = nb + n_modes (nb = 6 RBE2 / 3nb RBE3)
+    M_r: np.ndarray            # (nr, nr), nr = nb + n_modes
     C_r: np.ndarray            # (nr, nr)
     K_r: np.ndarray            # (nr, nr)
     T_b: np.ndarray            # (3nb, 6) rigid-body map D_Gamma of the boundary nodes
@@ -539,36 +842,53 @@ class ReducedSubstructure:
     boundary_idx: np.ndarray   # (nb,) 0-based RETAINED node indices: joint
                                # interface first, then any attachment nodes
     internal_idx: np.ndarray   # (n - nb,) remaining node indices
-    condensation: str          # "rbe2" or "rbe3"
+    condensation: str          # "rbe2" | "rbe3" | "RBE_rigid" | "RBE_average"
     vp_operator: np.ndarray    # (6, nr) coupling map: q_m = vp_operator @ q_r
     n_interface: int           # # of joint-interface nodes (first entries of
                                # boundary_idx); the remainder are attachment DoFs
+    vp_load: np.ndarray        # (nr, 6) load map: f_r = vp_load @ w_VP
+    directional: object = None  # DirectionalBoundary for the RBE_* modes, else None
+    T_red: np.ndarray = None   # (n_boundary, 6+n_io) RBE_rigid constraint, else None
 
     @classmethod
     def build(cls, name, data, boundary_idx, master_xyz, n_modes, zeta,
-              condensation="rbe2", weights=None, attachment_idx=None):
+              condensation="rbe2", weights=None, attachment_idx=None,
+              vpt_rows=None, io_rows=None, wu=None, wf=None):
         """
         Full reduction of one substructure: interface transformation -> boundary-
         first partition -> Craig-Bampton -> modal damping.
 
         :param name: "A" or "B" (report label)
         :param data: dict from :func:`load_or_export`
-        :param boundary_idx: interface node indices (from get_boundary_nodes)
+        :param boundary_idx: interface node indices (from get_boundary_nodes);
+            used by the whole-node modes only
         :param master_xyz: (3,) master / VP position
         :param n_modes: fixed-interface modes to keep
         :param zeta: modal damping ratio per elastic mode
-        :param condensation: "rbe2" -> rigid interface condensed to the 6-DoF VP
-            (reduced boundary); "rbe3" -> interface kept flexible as the boundary
-            set, VP defined by the weighted map for coupling only.
+        :param condensation: see the class docstring -- "rbe2", "rbe3",
+            "RBE_rigid" or "RBE_average"
         :param weights: RBE3 weighting W (see :func:`rbe3_vp_operator`); ignored
-            for RBE2.
+            by every other mode.
         :param attachment_idx: extra nodes retained in the CB boundary set (e.g. a
             load point) for static completeness, but excluded from the joint
-            interface (zero columns in the VP map). None -> interface only.
+            interface (zero columns in the VP map). Whole-node modes only; the
+            directional modes retain ``io_rows`` instead. None -> interface only.
+        :param vpt_rows: dict from :func:`read_vpt_rows` -- REQUIRED by the
+            directional modes, ignored by the whole-node ones.
+        :param io_rows: (name, node, direction) of the excitation / output DoFs to
+            retain, directional modes only.
+        :param wu: response weighting of the VPT (RBE_average only), pyFBS ``wu``.
+        :param wf: force weighting of the VPT (RBE_average only), pyFBS ``wf``.
+            Deliberately independent of ``wu`` -- see :func:`vpt_transformations`.
         """
         nodes = data["nodes"]
         interface_idx = np.asarray(boundary_idx)         # joint interface (Gamma)
         n_iface = len(interface_idx)
+
+        if condensation in ("RBE_rigid", "RBE_average"):
+            return cls._build_directional(
+                name, data, master_xyz, n_modes, zeta, condensation,
+                vpt_rows, io_rows or [], wu, wf)
 
         # attachment DoFs: extra nodes retained in the CB boundary set (e.g. a
         # load point) so their static response is captured exactly, but which
@@ -595,8 +915,9 @@ class ReducedSubstructure:
             vp_boundary = np.zeros((6, 3 * n_ret))      # attachment cols stay zero
             vp_boundary[:, :3 * n_iface] = GT
         else:
-            raise ValueError(f"unknown condensation {condensation!r} "
-                             f"(expected 'rbe2' or 'rbe3')")
+            raise ValueError(
+                f"unknown condensation {condensation!r} (expected 'rbe2', "
+                f"'rbe3', 'RBE_rigid' or 'RBE_average')")
 
         M_r, K_r, Psi, Phi, f_fixed_hz = craig_bampton(blocks, n_modes)
         C_r = modal_damping_matrix(M_r, K_r, zeta)
@@ -610,10 +931,74 @@ class ReducedSubstructure:
               f"{M_r.shape[0]} DoFs | fixed-interface modes "
               f"{f_fixed_hz[0]:.1f}..{f_fixed_hz[-1]:.1f} Hz"
               + (f" | +{n_att} attachment node(s) retained" if n_att else ""))
+        # rbe2 and rbe3 are reciprocal by construction (see the class docstring),
+        # so the load map is simply the transpose of the observation map.
         return cls(name=name, M_r=M_r, C_r=C_r, K_r=K_r, T_b=T_b, Psi=Psi,
                    Phi=Phi, nodes=nodes, boundary_idx=retained_idx,
                    internal_idx=internal_idx, condensation=condensation,
-                   vp_operator=vp_operator, n_interface=n_iface)
+                   vp_operator=vp_operator, n_interface=n_iface,
+                   vp_load=vp_operator.T)
+
+    @classmethod
+    def _build_directional(cls, name, data, master_xyz, n_modes, zeta,
+                           condensation, vpt_rows, io_rows, wu, wf):
+        """
+        The RBE_rigid / RBE_average reduction: keep only the DoFs the workbook
+        names (plus excitation and output), then either tie the interface ones
+        rigidly to the virtual point or observe/load it through pyFBS's Tu / Tf.
+
+        Both modes share the boundary, so they differ ONLY in the virtual-point
+        map -- which is what makes a comparison between them a clean measurement
+        of the rigid-vs-averaged interface assumption.
+        """
+        assert vpt_rows is not None, (
+            f"condensation {condensation!r} needs vpt_rows -- call read_vpt_rows("
+            f"xlsx, '{name}', nodes) and pass the result")
+        nodes = data["nodes"]
+
+        # the UNION of channel and impact rows: the boundary must carry both, and
+        # staying with the union keeps it invariant when the sheets are unified.
+        union = vpt_rows["channels"] + vpt_rows["impacts"]
+        boundary = build_directional_boundary(union, io_rows, len(nodes))
+        blocks = rotate_and_partition(data["K"], data["M"], boundary)
+
+        Ru = vpt_idm(nodes, vpt_rows["channels"], master_xyz)
+        Rf = vpt_idm(nodes, vpt_rows["impacts"], master_xyz)
+        n_io = int(np.count_nonzero(~boundary.interface_mask))
+        T_red = None
+
+        if condensation == "RBE_rigid":
+            T_red = rigid_boundary_map(union, boundary,
+                                       vpt_idm(nodes, union, master_xyz))
+            blocks = condense_boundary(blocks, T_red)
+            vp_boundary = np.zeros((6, 6 + n_io))
+            vp_boundary[:, :6] = np.eye(6)               # VP = the 6 master DoFs
+            vp_boundary_load = vp_boundary.T             # rigid MPC is reciprocal
+        else:                                            # RBE_average
+            Tu, Tf = vpt_transformations(Ru, Rf, wu, wf)
+            vp_boundary = Tu @ vpt_selection(vpt_rows["channels"], boundary)
+            vp_boundary_load = vpt_selection(vpt_rows["impacts"], boundary).T @ Tf
+
+        M_r, K_r, Psi, Phi, f_fixed_hz = craig_bampton(blocks, n_modes)
+        C_r = modal_damping_matrix(M_r, K_r, zeta)
+
+        vp_operator = np.hstack([vp_boundary, np.zeros((6, n_modes))])
+        vp_load = np.vstack([vp_boundary_load, np.zeros((n_modes, 6))])
+
+        n_if_dof = int(np.count_nonzero(boundary.interface_mask))
+        print(f"[{name}] {condensation} reduced {3 * len(nodes)} -> "
+              f"{M_r.shape[0]} DoFs | fixed-interface modes "
+              f"{f_fixed_hz[0]:.1f}..{f_fixed_hz[-1]:.1f} Hz | "
+              f"{n_if_dof} directional interface DoFs over "
+              f"{len(boundary.node_idx) - n_io} nodes"
+              + (f" + {n_io} I/O DoF(s)" if n_io else ""))
+        return cls(name=name, M_r=M_r, C_r=C_r, K_r=K_r,
+                   T_b=rbe2_transformation(nodes, boundary.node_idx, master_xyz),
+                   Psi=Psi, Phi=Phi, nodes=nodes,
+                   boundary_idx=boundary.node_idx, internal_idx=boundary.i_idx,
+                   condensation=condensation, vp_operator=vp_operator,
+                   n_interface=n_if_dof, vp_load=vp_load,
+                   directional=boundary, T_red=T_red)
 
     def recovery_row(self, position, direction):
         """
@@ -625,7 +1010,9 @@ class ReducedSubstructure:
         The position snaps to the nearest FE node (like pyfbs
         update_locations_df). Internal node -> direction projected onto its
         [Psi | Phi] rows; interface node -> its T_b rows for RBE2 (moves rigidly
-        with the master) or its own retained DoFs for RBE3.
+        with the master) or its own retained DoFs for RBE3. The directional modes
+        take :meth:`_recovery_row_directional`, where a node can be retained in
+        SOME directions only.
         """
         pos = np.asarray(position, dtype=float)
         dvec = np.asarray(direction, dtype=float)
@@ -634,6 +1021,9 @@ class ReducedSubstructure:
         if dist[j] > 5e-3:
             print(f"[{self.name}] recovery_row: snapped {dist[j] * 1e3:.2f} mm "
                   f"to node {j} -- check the position")
+
+        if self.directional is not None:
+            return self._recovery_row_directional(j, dvec)
 
         row = np.zeros(self.M_r.shape[0])
         nb = self.Psi.shape[1]                         # boundary block width
@@ -655,15 +1045,67 @@ class ReducedSubstructure:
             row[nb:] = dvec @ self.Phi[3 * q:3 * q + 3, :]
         return row
 
+    def _recovery_row_directional(self, j, dvec):
+        """
+        :meth:`recovery_row` for the RBE_rigid / RBE_average boundaries, where a
+        node may be retained in only some of its directions.
+
+        In the rotated frame of a retained node, u_j = C_j^T a_j + N_j^T b_j with
+        a_j the retained (boundary) coordinates and b_j the free ones, which sit
+        in the INTERIOR partition. So a direction picks up both parts:
+
+            d.u_j = (C_j d).a_j + (N_j d).b_j
+
+        For RBE_rigid the boundary was condensed further, a = T_red q_b, so the
+        first term goes through T_red. A node that is not retained at all has all
+        three DoFs in the interior and behaves like the whole-node modes.
+        """
+        row = np.zeros(self.M_r.shape[0])
+        nb = self.Psi.shape[1]                         # boundary block width
+        b = self.directional
+
+        def interior(rows, weights):
+            """accumulate weights . [Psi | Phi][rows] into the row"""
+            row[:nb] += weights @ self.Psi[rows, :]
+            row[nb:] += weights @ self.Phi[rows, :]
+
+        if int(j) in b.slot:                           # partially/fully retained
+            a_part = b.C[int(j)] @ dvec                # (k_j,) boundary weights
+            if self.T_red is not None:                 # RBE_rigid: a = T_red q_b
+                row[:nb] += a_part @ self.T_red[b.slot[int(j)], :]
+            else:                                      # RBE_average: a IS q_b
+                row[b.slot[int(j)]] += a_part
+            free = b.N[int(j)]
+            if free.size:                              # the unretained directions
+                interior(b.free_slot(j), free @ dvec)
+        else:                                          # fully interior node
+            rows = np.searchsorted(b.i_idx, 3 * int(j) + np.arange(3))
+            assert np.array_equal(b.i_idx[rows], 3 * int(j) + np.arange(3)), \
+                f"node {j} is neither retained nor fully interior"
+            interior(rows, dvec)
+        return row
+
     def interface_recovery(self):
         """
         Map U (3*nb_nodes, nr) from reduced coordinates to the PHYSICAL
         interface node displacements, u_Gamma = U @ q_r, ordered like
         ``boundary_idx`` (x, y, z per node). RBE2: the rigid expansion T_b of
         the 6 master DoFs (the inverse of the RBE2 condensation); RBE3:
-        identity on the retained interface DoFs. The modal columns are zero --
-        fixed-interface modes do not move the boundary by construction.
+        identity on the retained interface DoFs. The directional modes rebuild
+        each node from its retained and free parts, so unlike RBE2/RBE3 their
+        modal columns are NOT zero -- a partially retained node still moves with
+        the fixed-interface modes along its unretained directions.
         """
+        if self.directional is not None:
+            b = self.directional
+            iface_nodes = [int(j) for k, j in enumerate(b.node_idx)
+                           if b.interface_mask[b.slot[int(j)]].any()]
+            U = np.zeros((3 * len(iface_nodes), self.M_r.shape[0]))
+            for p, j in enumerate(iface_nodes):
+                U[3 * p:3 * p + 3, :] = np.vstack(
+                    [self._recovery_row_directional(j, e) for e in np.eye(3)])
+            return U
+
         if self.condensation == "rbe2":
             n_att3 = self.Psi.shape[1] - 6             # attachment cols in boundary block
             U_b = np.hstack([self.T_b, np.zeros((self.T_b.shape[0], n_att3))])
@@ -694,7 +1136,7 @@ def assemble_coupled(sub_A, sub_B):
     without it their hardened resonances stall the continuation.
 
     :param sub_A/sub_B: :class:`ReducedSubstructure`
-    :return: (M, C, K, Bc) dense, d = nrA + nrB
+    :return: (M, C, K, Bc, Bc_load) dense, d = nrA + nrB
     """
     from scipy.linalg import block_diag
 
@@ -703,15 +1145,24 @@ def assemble_coupled(sub_A, sub_B):
 
     # x_r = q_mA - q_mB through each substructure's VP operator (q_m = P q_r).
     # RBE2: P = [I6 | 0] reproduces the signed-Boolean master coupling exactly;
-    # RBE3: P = [G^T | 0] gathers the VP from the flexible interface DoFs.
+    # RBE3: P = [G^T | 0] gathers the VP from the flexible interface DoFs;
+    # RBE_average: P = [Tu S_u | 0] reads the VP off the sensor channels alone.
     Bc = np.zeros((6, d))
     Bc[:, :nrA] = sub_A.vp_operator          # +A VP
     Bc[:, nrA:] = -sub_B.vp_operator         # -B VP
 
+    # ...and the reverse map, spreading the joint wrench back onto q. It is NOT
+    # simply Bc.T for RBE_average: there the VP is observed through the channel
+    # rows but loaded through the impact rows, which are different DoFs. The
+    # other three condensations are reciprocal, so Bc_load == Bc.T for them.
+    Bc_load = np.zeros((d, 6))
+    Bc_load[:nrA] = sub_A.vp_load
+    Bc_load[nrA:] = -sub_B.vp_load
+
     M = block_diag(sub_A.M_r, sub_B.M_r)
     C = block_diag(sub_A.C_r, sub_B.C_r)
     K = block_diag(sub_A.K_r, sub_B.K_r)
-    return M, C, K, Bc
+    return M, C, K, Bc, Bc_load
 
 
 # ===========================================================================
@@ -723,6 +1174,38 @@ def assemble_coupled(sub_A, sub_B):
 # ===========================================================================
 
 VP_DOFS = ("ux", "uy", "uz", "rx", "ry", "rz")
+
+# How each condensation defines the two exported physical DoF families, for the
+# CSV comment header. Shared by the testbench_*_CB examples so the four
+# descriptions cannot drift apart between them.
+CONDENSATION_HEADER_TEXT = {
+    "rbe2": (
+        "the RBE2 master DoFs (= the condensed CB boundary block)",
+        "u_Gamma = T_b q_m -- rigid expansion of the VP master (inverse RBE2)"),
+    "rbe3": (
+        "the RBE3 weighted interface average G^T q_Gamma",
+        "the retained (flexible) RBE3 interface DoFs = CB boundary block, no "
+        "expansion needed"),
+    "RBE_rigid": (
+        "the RBE_rigid master DoFs -- a rigid MPC on the workbook's "
+        "channel/impact directions only",
+        "u_Gamma rebuilt from the retained directions (rigidly tied to the "
+        "master) plus the free ones via [Psi | Phi]"),
+    "RBE_average": (
+        "pyFBS's VPT response map Tu applied to the sensor channels (loads go "
+        "back through Tf on the impact rows -- not its transpose)",
+        "u_Gamma rebuilt from the retained directional DoFs plus the free ones "
+        "via [Psi | Phi]"),
+}
+
+
+def condensation_header_text(condensation):
+    """(vp_txt, iface_txt) describing how ``condensation`` defines the exported
+    ``*_vp_*`` and ``*_n<id>_u*`` columns."""
+    try:
+        return CONDENSATION_HEADER_TEXT[condensation]
+    except KeyError:
+        raise ValueError(f"unknown condensation {condensation!r}") from None
 
 
 def nearest_node(data, position):
@@ -911,7 +1394,7 @@ class CoupledCubicCB(SecondOrderODE):
     The coupled reduced testbench as a pyhbm second-order system:
 
         M q'' + C q' + K q
-            + Bc^T (k * x + c * xdot + alpha * x^3 + beta * xdot^3)
+            + Bc_load (k * x + c * xdot + alpha * x^3 + beta * xdot^3)
             = f_r F0 cos(tau)
 
     with x = Bc q the 6 relative master DoFs (VP_A - VP_B). M, C, K are the
@@ -920,16 +1403,24 @@ class CoupledCubicCB(SecondOrderODE):
     enters through the nonlinear term, the same bushing law as the pyFBS
     example's TestbenchCubicSpring. qdot passed by pyhbm is the PHYSICAL
     velocity, so the xdot terms need no extra omega scaling.
+
+    ``Bc_load`` defaults to Bc.T, which is exact for every reciprocal
+    condensation (rbe2, rbe3, RBE_rigid). RBE_average observes the virtual point
+    through the sensor channels and loads it through the impact rows -- different
+    DoFs -- so there it is a genuinely different matrix and the resulting
+    Jacobian Bc_load @ J @ Bc is NOT symmetric.
     """
     is_real_valued = True
 
-    def __init__(self, M, C, K, Bc, k_diag, c_diag, alpha_diag, beta_diag, f_r, F0):
+    def __init__(self, M, C, K, Bc, k_diag, c_diag, alpha_diag, beta_diag, f_r, F0,
+                 Bc_load=None):
         self.mass_matrix = M
         self.damping_matrix = C
         self.stiffness_matrix = K
         self.dimension = M.shape[0]
         self.polynomial_degree = 3            # sets the AFT sampling (exact)
         self.Bc = Bc
+        self.Bc_load = Bc.T if Bc_load is None else Bc_load
         self.k_diag = np.asarray(k_diag, dtype=float)
         self.c_diag = np.asarray(c_diag, dtype=float)
         self.alpha_diag = np.asarray(alpha_diag, dtype=float)
@@ -948,14 +1439,15 @@ class CoupledCubicCB(SecondOrderODE):
                  + self.c_diag[None, :, None] * xd
                  + self.alpha_diag[None, :, None] * x ** 3
                  + self.beta_diag[None, :, None] * xd ** 3)
-        return np.einsum("ji,tjk->tik", self.Bc, f_int)   # Bc^T f_int
+        return np.einsum("ij,tjk->tik", self.Bc_load, f_int)   # Bc_load f_int
 
     def jacobian_nonlinear_term(self, q, q_dot, adimensional_time):
         x = np.einsum("ij,tjk->tik", self.Bc, q)[:, :, 0]           # (Nt, 6)
         diag = self.k_diag[None, :] + 3.0 * self.alpha_diag[None, :] * x ** 2
-        return np.einsum("ji,tj,jk->tik", self.Bc, diag, self.Bc)   # (Nt, d, d)
+        # Bc_load @ diag(.) @ Bc -- 'ij,tj,jk' contracts the diagonal in place
+        return np.einsum("ij,tj,jk->tik", self.Bc_load, diag, self.Bc)  # (Nt, d, d)
 
     def jacobian_nonlinear_term_qdot(self, q, q_dot, adimensional_time):
         xd = np.einsum("ij,tjk->tik", self.Bc, q_dot)[:, :, 0]
         diag = self.c_diag[None, :] + 3.0 * self.beta_diag[None, :] * xd ** 2
-        return np.einsum("ji,tj,jk->tik", self.Bc, diag, self.Bc)
+        return np.einsum("ij,tj,jk->tik", self.Bc_load, diag, self.Bc)

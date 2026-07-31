@@ -41,10 +41,11 @@ import numpy as np
 
 from dynamical_system import (CB_DIR, CoupledDryFrictionCB, ReducedSubstructure,
                               assemble_coupled, channel_header_lines,
-                              channel_snap_info, get_boundary_nodes,
-                              load_or_export, nearest_node,
+                              channel_snap_info, check_vpt_rows,
+                              condensation_header_text,
+                              get_boundary_nodes, load_or_export, nearest_node,
                               output_channel_label, physical_recovery,
-                              read_channels, read_descriptor,
+                              read_channels, read_descriptor, read_vpt_rows,
                               save_physical_solution)
 
 # ---------------------------------------------------------------------------
@@ -103,11 +104,18 @@ F_LO, F_HI = 40.0, 500          # continuation window [Hz]
 ZETA = 0.005                        # modal damping per substructure
 N_MODES = 60                        # fixed-interface modes per substructure
 
-# interface condensation -- run any subset (both by default):
-#   "rbe2" -- rigid MPC, interface condensed to the 6-DoF VP (stiffens the joint)
-#   "rbe3" -- interpolation MPC, interface kept flexible, VP by weighted average
+# interface condensation -- run any subset. The first two retain all 3 DoFs of
+# every interface node; the last two retain only the DoFs the workbook names,
+# which is the DoF set pyFBS's VPT actually works with:
+#   "rbe2"        -- rigid MPC, interface condensed to the 6-DoF VP
+#   "rbe3"        -- interpolation MPC, interface flexible, VP by weighted average
+#   "RBE_rigid"   -- rigid MPC on the VPT DoFs only
+#   "RBE_average" -- VP observed/loaded through pyFBS's Tu / Tf
 CONDENSATION_METHODS = ("rbe2", "rbe3")
 RBE3_WEIGHTS = None                 # None -> uniform; see rbe3_vp_operator
+VPT_WU = VPT_WF = None              # RBE_average weighting; None -> identity
+
+DIRECTIONAL_METHODS = ("RBE_rigid", "RBE_average")
 
 # interface (RBE2 slave) definition: "descriptor" = the exact nodes pyFBS's VPT
 # uses, from the exported JSON (see get_boundary_nodes for the alternatives)
@@ -165,14 +173,7 @@ def export_header(method, solve_time, n_points, iface, channels, out_label,
     :param out_label: channel column feeding the plotted uout_* summary columns
     :param in_node: (ansys_id, xyz) of the snapped drive node
     """
-    if method == "rbe2":
-        vp_txt = "the RBE2 master DoFs (= the condensed CB boundary block)"
-        iface_txt = ("u_Gamma = T_b q_m -- rigid expansion of the VP master "
-                     "(inverse RBE2)")
-    else:
-        vp_txt = "the RBE3 weighted interface average G^T q_Gamma"
-        iface_txt = ("the retained (flexible) RBE3 interface DoFs "
-                     "= CB boundary block, no expansion needed")
+    vp_txt, iface_txt = condensation_header_text(method)
     in_id, in_xyz = in_node
     lines = [
         f"testbench_dryFriction_CB physical forced-response reference -- "
@@ -250,23 +251,41 @@ if __name__ == "__main__":
     print(f"channels: A {len(channels['A'])}, B {len(channels['B'])} | "
           f"plotted output channel: {out_label}")
 
-    colors = {"rbe2": "#d62728", "rbe3": "#1f77b4"}
+    # the directional condensations need the workbook rows themselves, plus the
+    # single I/O DoF each side retains (drive point on B, measured channel on A)
+    vpt_rows = {name: read_vpt_rows(XLSX_PATH, name, substructures[name]["nodes"])
+                for name in ("A", "B")}
+    for name in ("A", "B"):
+        check_vpt_rows(vpt_rows[name], DESCRIPTOR, name,
+                       substructures[name]["nnum"])
+    out_node_A = int(np.argmin(
+        np.linalg.norm(substructures["A"]["nodes"] - OUT_POS, axis=1)))
+    io_rows = {"A": [("out", out_node_A, OUT_DIR)],
+               "B": [("in", drive_node_B, INP_DIR)]}
+
+    colors = {"rbe2": "#d62728", "rbe3": "#1f77b4",
+              "RBE_rigid": "#ff7f0e", "RBE_average": "#2ca02c"}
     fig, (ax_max, ax_h1) = plt.subplots(2, 1, figsize=(9, 8), sharex=True)
 
     for method in CONDENSATION_METHODS:
-        print(f"\n=== condensation: {method.upper()} ===")
+        print(f"\n=== condensation: {method} ===")
+        if method in DIRECTIONAL_METHODS:
+            extra = {name: dict(vpt_rows=vpt_rows[name], io_rows=io_rows[name],
+                                wu=VPT_WU, wf=VPT_WF) for name in ("A", "B")}
+        else:
+            extra = {"A": {}, "B": dict(attachment_idx=[drive_node_B])}
         sub_A = ReducedSubstructure.build("A", substructures["A"], idx_A, VP_XYZ,
                                           N_MODES, ZETA, condensation=method,
-                                          weights=RBE3_WEIGHTS)
+                                          weights=RBE3_WEIGHTS, **extra["A"])
         sub_B = ReducedSubstructure.build("B", substructures["B"], idx_B, VP_XYZ,
                                           N_MODES, ZETA, condensation=method,
-                                          weights=RBE3_WEIGHTS,
-                                          attachment_idx=[drive_node_B])
-        M, C, K, Bc = assemble_coupled(sub_A, sub_B)
+                                          weights=RBE3_WEIGHTS, **extra["B"])
+        M, C, K, Bc, Bc_load = assemble_coupled(sub_A, sub_B)
         f_r = np.concatenate([np.zeros(sub_A.M_r.shape[0]),
                               sub_B.recovery_row(INP_POS, INP_DIR)])
         system = CoupledDryFrictionCB(M, C, K, Bc, f_r, F0, MU_TRANS, N_CLAMP,
-                                      ALPHA, K_TRANS, K_ROT, G, POLY_DEG)
+                                      ALPHA, K_TRANS, K_ROT, G, POLY_DEG,
+                                      Bc_load=Bc_load)
 
         t0 = time.perf_counter()
         solution_set = run_hbm(system)

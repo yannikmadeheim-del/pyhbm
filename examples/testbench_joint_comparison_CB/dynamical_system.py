@@ -36,8 +36,11 @@ load_or_export = cb.load_or_export
 read_descriptor = cb.read_descriptor
 nearest_node = cb.nearest_node
 read_channels = cb.read_channels
+read_vpt_rows = cb.read_vpt_rows
+check_vpt_rows = cb.check_vpt_rows
 channel_snap_info = cb.channel_snap_info
 channel_header_lines = cb.channel_header_lines
+condensation_header_text = cb.condensation_header_text
 output_channel_label = cb.output_channel_label
 physical_recovery = cb.physical_recovery
 save_physical_solution = cb.save_physical_solution
@@ -300,7 +303,7 @@ class CoupledJointCB(SecondOrderODE):
     The coupled reduced testbench with an ASSEMBLED joint, as a pyhbm
     second-order system:
 
-        M q'' + C q' + K q + Bc^T sum_e f_e(x, xdot) = f_r F0 cos(tau)
+        M q'' + C q' + K q + Bc_load sum_e f_e(x, xdot) = f_r F0 cos(tau)
 
     with x = Bc q the 6 relative virtual-point DoFs (VP_A - VP_B). M, C, K are
     the linearly UNCOUPLED block-diagonal matrices of :func:`assemble_coupled`;
@@ -309,6 +312,11 @@ class CoupledJointCB(SecondOrderODE):
     Each element writes only its own DoF rows, so the elements are independent
     and freely combinable. qdot handed over by pyhbm is the PHYSICAL velocity,
     so the elements need no extra omega scaling.
+
+    ``Bc_load`` defaults to Bc.T, exact for every reciprocal condensation (rbe2,
+    rbe3, RBE_rigid). RBE_average observes the virtual point through the sensor
+    channels but loads it through the impact rows, so there it differs and the
+    Jacobian Bc_load @ J @ Bc is not symmetric.
 
     :param joints: list of :class:`JointElement` (see :func:`make_joints`).
     :param polynomial_degree: AFT sampling knob, N_t = (degree+1)*max(|h|)+1.
@@ -323,13 +331,15 @@ class CoupledJointCB(SecondOrderODE):
     """
     is_real_valued = True
 
-    def __init__(self, M, C, K, Bc, f_r, F0, joints, polynomial_degree):
+    def __init__(self, M, C, K, Bc, f_r, F0, joints, polynomial_degree,
+                 Bc_load=None):
         self.mass_matrix = M
         self.damping_matrix = C
         self.stiffness_matrix = K
         self.dimension = M.shape[0]
         self.polynomial_degree = polynomial_degree
         self.Bc = Bc
+        self.Bc_load = Bc.T if Bc_load is None else Bc_load
         self.f_r = np.asarray(f_r, dtype=float)
         self.F0 = float(F0)
         self.joints = list(joints)
@@ -350,7 +360,7 @@ class CoupledJointCB(SecondOrderODE):
         tau = np.asarray(adimensional_time)
         return (self.F0 * np.cos(tau))[:, None, None] * self.f_r[None, :, None]
 
-    # --- pyhbm interface: the joint acts on x = Bc q, so f_nl = Bc^T f_joint
+    # --- pyhbm interface: the joint acts on x = Bc q, so f_nl = Bc_load f_joint
     # (the matmuls broadcast the (6, d) coupling over the Nt time samples)
     def nonlinear_term(self, q, q_dot, adimensional_time):
         x = self.Bc @ q                                        # (Nt, 6, 1)
@@ -358,18 +368,18 @@ class CoupledJointCB(SecondOrderODE):
         f = np.zeros((x.shape[0], N_IF, 1))
         for element in self.joints:
             f += element.force(x, xdot)
-        return self.Bc.T @ f
+        return self.Bc_load @ f
 
     def jacobian_nonlinear_term(self, q, q_dot, adimensional_time):
         x, xdot = self.Bc @ q, self.Bc @ q_dot
         J = np.zeros((x.shape[0], N_IF, N_IF))
         for element in self.joints:
             J += element.jac_u(x, xdot)
-        return self.Bc.T @ J @ self.Bc                         # (Nt, d, d)
+        return self.Bc_load @ J @ self.Bc                      # (Nt, d, d)
 
     def jacobian_nonlinear_term_qdot(self, q, q_dot, adimensional_time):
         x, xdot = self.Bc @ q, self.Bc @ q_dot
         J = np.zeros((x.shape[0], N_IF, N_IF))
         for element in self.joints:
             J += element.jac_udot(x, xdot)
-        return self.Bc.T @ J @ self.Bc
+        return self.Bc_load @ J @ self.Bc

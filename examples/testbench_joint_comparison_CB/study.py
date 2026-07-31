@@ -79,7 +79,7 @@ JOINT_SETS = [
      dict(type="cubic",  alpha=[0.0, 1.0e8], dofs=ALL6)],
 ]
 
-GLOBAL_SWEEP = dict(condensation=["rbe2", "rbe3"])
+GLOBAL_SWEEP = dict(condensation=["rbe2", "rbe3", "RBE_rigid", "RBE_average"])
 # ---------------------------------------------------------------------------
 
 SWEEP_EXEMPT = ("dofs", "spin_dof")   # tuples/strings, not sweepable value lists

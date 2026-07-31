@@ -33,8 +33,11 @@ load_or_export = cb.load_or_export
 read_descriptor = cb.read_descriptor
 nearest_node = cb.nearest_node
 read_channels = cb.read_channels
+read_vpt_rows = cb.read_vpt_rows
+check_vpt_rows = cb.check_vpt_rows
 channel_snap_info = cb.channel_snap_info
 channel_header_lines = cb.channel_header_lines
+condensation_header_text = cb.condensation_header_text
 output_channel_label = cb.output_channel_label
 physical_recovery = cb.physical_recovery
 save_physical_solution = cb.save_physical_solution
@@ -47,7 +50,7 @@ class CoupledDryFrictionCB(SecondOrderODE):
     The coupled reduced testbench with a DRY-FRICTION joint, as a pyhbm
     second-order system:
 
-        M q'' + C q' + K q + Bc^T f_joint(x, xdot) = f_r F0 cos(tau)
+        M q'' + C q' + K q + Bc_load f_joint(x, xdot) = f_r F0 cos(tau)
 
     with x = Bc q the 6 relative master DoFs (VP_A - VP_B). M, C, K are the
     linearly UNCOUPLED block-diagonal matrices of :func:`assemble_coupled`; the
@@ -80,13 +83,14 @@ class CoupledDryFrictionCB(SecondOrderODE):
     is_real_valued = True
 
     def __init__(self, M, C, K, Bc, f_r, F0, mu_trans, N, alpha, k_trans,
-                 k_rot, G, polynomial_degree):
+                 k_rot, G, polynomial_degree, Bc_load=None):
         self.mass_matrix = M
         self.damping_matrix = C
         self.stiffness_matrix = K
         self.dimension = M.shape[0]
         self.polynomial_degree = polynomial_degree
         self.Bc = Bc
+        self.Bc_load = Bc.T if Bc_load is None else Bc_load
         self.f_r = np.asarray(f_r, dtype=float)
         self.F0 = float(F0)
         self.mu_trans = float(mu_trans)
@@ -158,19 +162,19 @@ class CoupledDryFrictionCB(SecondOrderODE):
                       * (1.0 - t_rz ** 2))
         return J
 
-    # --- pyhbm interface: the joint acts on x = Bc q, so f_nl = Bc^T f_joint
+    # --- pyhbm interface: the joint acts on x = Bc q, so f_nl = Bc_load f_joint
     # (the matmuls broadcast the (6, d) coupling over the Nt time samples)
     def nonlinear_term(self, q, q_dot, adimensional_time):
         x = self.Bc @ q                                        # (Nt, 6, 1)
         xdot = self.Bc @ q_dot                                 # physical velocity
-        return self.Bc.T @ self.interface_force(x, xdot, adimensional_time)
+        return self.Bc_load @ self.interface_force(x, xdot, adimensional_time)
 
     def jacobian_nonlinear_term(self, q, q_dot, adimensional_time):
         x, xdot = self.Bc @ q, self.Bc @ q_dot
         J = self.interface_jacobian(x, xdot, adimensional_time)
-        return self.Bc.T @ J @ self.Bc                         # (Nt, d, d)
+        return self.Bc_load @ J @ self.Bc                      # (Nt, d, d)
 
     def jacobian_nonlinear_term_qdot(self, q, q_dot, adimensional_time):
         x, xdot = self.Bc @ q, self.Bc @ q_dot
         J = self.interface_jacobian_qdot(x, xdot, adimensional_time)
-        return self.Bc.T @ J @ self.Bc
+        return self.Bc_load @ J @ self.Bc

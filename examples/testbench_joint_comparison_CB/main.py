@@ -37,11 +37,12 @@ import numpy as np
 # from an uninstalled checkout.
 from dynamical_system import (CB_DIR, CoupledJointCB, ReducedSubstructure,
                               assemble_coupled, channel_header_lines,
-                              channel_snap_info, get_boundary_nodes,
-                              load_or_export, make_joints, nearest_node,
-                              output_channel_label, physical_recovery,
-                              read_channels, read_descriptor,
-                              save_physical_solution)
+                              channel_snap_info, check_vpt_rows,
+                              condensation_header_text,
+                              get_boundary_nodes, load_or_export, make_joints,
+                              nearest_node, output_channel_label,
+                              physical_recovery, read_channels, read_descriptor,
+                              read_vpt_rows, save_physical_solution)
 
 from pyhbm import (BiExponentialAdaptation, ExponentialAdaptation,
                    FourierOmegaPoint, HarmonicBalanceMethod,
@@ -82,9 +83,12 @@ CONFIG = dict(
     solver = "pyhbm-cb",           # names the pipeline in mixed comparisons
 
     # --- reduction (pyhbm-only) -------------------------------------------
-    condensation = "rbe3",         # "rbe2" (rigid MPC, interface condensed to
-                                   # the 6-DoF VP) | "rbe3" (interpolation MPC,
-                                   # interface kept flexible)
+    condensation = "rbe3",         # whole-node boundary: "rbe2" (rigid MPC,
+                                   # interface condensed to the 6-DoF VP) |
+                                   # "rbe3" (interpolation MPC, flexible).
+                                   # directional (VPT) boundary: "RBE_rigid" |
+                                   # "RBE_average" -- only the DoFs the workbook
+                                   # names, as pyFBS's VPT sees them
     n_modes = 20,                  # fixed-interface modes per substructure
     interface_method = "descriptor",   # see get_boundary_nodes for alternatives
     rbe3_weights = None,           # None -> uniform; see rbe3_vp_operator
@@ -160,10 +164,25 @@ def load_substructures():
     print(f"channels: A {len(channels['A'])}, B {len(channels['B'])} | "
           f"plotted output channel: {out_label}")
 
+    # the directional condensations need the workbook rows themselves, plus the
+    # single I/O DoF each side retains (drive point on B, measured channel on A)
+    out_pos = np.array(descriptor["output"]["position"])
+    out_dir = np.array(descriptor["output"]["direction"])
+    out_node_A = int(np.argmin(
+        np.linalg.norm(substructures["A"]["nodes"] - out_pos, axis=1)))
+    vpt_rows = {name: read_vpt_rows(XLSX_PATH, name, substructures[name]["nodes"])
+                for name in ("A", "B")}
+    for name in ("A", "B"):
+        check_vpt_rows(vpt_rows[name], descriptor, name,
+                       substructures[name]["nnum"])
+
     return dict(descriptor=descriptor, substructures=substructures,
                 vp_xyz=np.array(descriptor["vp"]["position"]),
                 inp_pos=inp_pos, inp_dir=inp_dir, drive_node_B=drive_node_B,
-                channels=channels, chan_info=chan_info, out_label=out_label)
+                channels=channels, chan_info=chan_info, out_label=out_label,
+                vpt_rows=vpt_rows,
+                io_rows={"A": [("out", out_node_A, out_dir)],
+                         "B": [("in", drive_node_B, inp_dir)]})
 
 
 def build_reduced(cfg, ctx):
@@ -176,28 +195,35 @@ def build_reduced(cfg, ctx):
     :func:`load_substructures` because ``interface_method`` is a config axis
     like the other reduction keys; the lookup itself is cheap.
 
-    :returns: (M, C, K, Bc, f_r, sub_A, sub_B) -- the block-diagonal reduced
-        matrices, the 6-DoF gap operator x = Bc q = VP_A - VP_B, the reduced
-        load vector of the unit drive force and both reduced substructures.
+    :returns: (M, C, K, Bc, Bc_load, f_r, sub_A, sub_B) -- the block-diagonal
+        reduced matrices, the 6-DoF gap operator x = Bc q = VP_A - VP_B, the map
+        spreading the joint wrench back onto q (Bc.T except for RBE_average), the
+        reduced load vector of the unit drive force and both substructures.
     """
     idx_A, idx_B = get_boundary_nodes(
         cfg["interface_method"], ctx["substructures"]["A"],
         ctx["substructures"]["B"], xlsx_path=XLSX_PATH,
         descriptor=ctx["descriptor"])
 
+    if cfg["condensation"] in ("RBE_rigid", "RBE_average"):
+        extra = {name: dict(vpt_rows=ctx["vpt_rows"][name],
+                            io_rows=ctx["io_rows"][name]) for name in ("A", "B")}
+    else:
+        extra = {"A": {}, "B": dict(attachment_idx=[ctx["drive_node_B"]])}
+
     sub_A = ReducedSubstructure.build(
         "A", ctx["substructures"]["A"], idx_A, ctx["vp_xyz"], cfg["n_modes"],
         cfg["modal_damping"], condensation=cfg["condensation"],
-        weights=cfg["rbe3_weights"])
+        weights=cfg["rbe3_weights"], **extra["A"])
     sub_B = ReducedSubstructure.build(
         "B", ctx["substructures"]["B"], idx_B, ctx["vp_xyz"], cfg["n_modes"],
         cfg["modal_damping"], condensation=cfg["condensation"],
-        weights=cfg["rbe3_weights"], attachment_idx=[ctx["drive_node_B"]])
+        weights=cfg["rbe3_weights"], **extra["B"])
 
-    M, C, K, Bc = assemble_coupled(sub_A, sub_B)
+    M, C, K, Bc, Bc_load = assemble_coupled(sub_A, sub_B)
     f_r = np.concatenate([np.zeros(sub_A.M_r.shape[0]),
                           sub_B.recovery_row(ctx["inp_pos"], ctx["inp_dir"])])
-    return M, C, K, Bc, f_r, sub_A, sub_B
+    return M, C, K, Bc, Bc_load, f_r, sub_A, sub_B
 
 
 def solve_config(cfg, reduced):
@@ -212,10 +238,10 @@ def solve_config(cfg, reduced):
 
     :returns: (system, solution_set, solve_time_s)
     """
-    M, C, K, Bc, f_r, _, _ = reduced
+    M, C, K, Bc, Bc_load, f_r, _, _ = reduced
     system = CoupledJointCB(M, C, K, Bc, f_r, cfg["F0"],
                             make_joints(cfg["joints"]),
-                            cfg["polynomial_degree"])
+                            cfg["polynomial_degree"], Bc_load=Bc_load)
     solver = HarmonicBalanceMethod(
         harmonics=list(cfg["harmonics"]), second_order_ode=system,
         corrector_parameterization=SOLVER_PARTS[cfg["parameterization"]],
@@ -266,14 +292,7 @@ def export_header(cfg, ctx, sub_A, sub_B, solve_time, n_points, iface):
 
     :param iface: {"A": (ansys_ids, xyz (nb,3)), "B": ...} interface node info
     """
-    if cfg["condensation"] == "rbe2":
-        vp_txt = "the RBE2 master DoFs (= the condensed CB boundary block)"
-        iface_txt = ("u_Gamma = T_b q_m -- rigid expansion of the VP master "
-                     "(inverse RBE2)")
-    else:
-        vp_txt = "the RBE3 weighted interface average G^T q_Gamma"
-        iface_txt = ("the retained (flexible) RBE3 interface DoFs "
-                     "= CB boundary block, no expansion needed")
+    vp_txt, iface_txt = condensation_header_text(cfg["condensation"])
     in_id, in_xyz = nearest_node(ctx["substructures"]["B"], ctx["inp_pos"])
     lines = [
         f"testbench_joint_comparison_CB physical forced-response -- "
@@ -340,7 +359,7 @@ def save_solution(path, cfg, ctx, reduced, solution_set, solve_time):
 
     :returns: (freq_hz, uout_h1_abs, uout_time_max) for the plot.
     """
-    _, _, _, _, f_r, sub_A, sub_B = reduced
+    _, _, _, _, _, f_r, sub_A, sub_B = reduced
     # the joint-interface nodes are the leading entries of the CB boundary set;
     # any attachment node retained for the drive point follows them
     iface_idx = {sub.name: sub.boundary_idx[:sub.n_interface]
