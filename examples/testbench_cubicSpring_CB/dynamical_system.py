@@ -1085,6 +1085,24 @@ class ReducedSubstructure:
             interior(rows, dvec)
         return row
 
+    def interface_nodes(self):
+        """
+        The joint-interface node indices whose displacements
+        :meth:`interface_recovery` returns, in the SAME row order -- what the CSV
+        export needs to label its ``*_n<id>_u*`` columns.
+
+        Whole-node modes: the leading entries of ``boundary_idx`` (``n_interface``
+        is a node count there; any attachment node follows them). Directional
+        modes: the retained nodes carrying at least one interface direction --
+        there ``n_interface`` counts DoFs, not nodes, so it must NOT be used to
+        slice ``boundary_idx``.
+        """
+        if self.directional is None:
+            return self.boundary_idx[:self.n_interface]
+        b = self.directional
+        return np.array([int(j) for j in b.node_idx
+                         if b.interface_mask[b.slot[int(j)]].any()], dtype=int)
+
     def interface_recovery(self):
         """
         Map U (3*nb_nodes, nr) from reduced coordinates to the PHYSICAL
@@ -1097,9 +1115,7 @@ class ReducedSubstructure:
         the fixed-interface modes along its unretained directions.
         """
         if self.directional is not None:
-            b = self.directional
-            iface_nodes = [int(j) for k, j in enumerate(b.node_idx)
-                           if b.interface_mask[b.slot[int(j)]].any()]
+            iface_nodes = self.interface_nodes()
             U = np.zeros((3 * len(iface_nodes), self.M_r.shape[0]))
             for p, j in enumerate(iface_nodes):
                 U[3 * p:3 * p + 3, :] = np.vstack(

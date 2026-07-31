@@ -83,7 +83,7 @@ CONFIG = dict(
     solver = "pyhbm-cb",           # names the pipeline in mixed comparisons
 
     # --- reduction (pyhbm-only) -------------------------------------------
-    condensation = "rbe3",         # whole-node boundary: "rbe2" (rigid MPC,
+    condensation = "RBE_average",  # whole-node boundary: "rbe2" (rigid MPC,
                                    # interface condensed to the 6-DoF VP) |
                                    # "rbe3" (interpolation MPC, flexible).
                                    # directional (VPT) boundary: "RBE_rigid" |
@@ -360,10 +360,9 @@ def save_solution(path, cfg, ctx, reduced, solution_set, solve_time):
     :returns: (freq_hz, uout_h1_abs, uout_time_max) for the plot.
     """
     _, _, _, _, _, f_r, sub_A, sub_B = reduced
-    # the joint-interface nodes are the leading entries of the CB boundary set;
-    # any attachment node retained for the drive point follows them
-    iface_idx = {sub.name: sub.boundary_idx[:sub.n_interface]
-                 for sub in (sub_A, sub_B)}
+    # the exported interface node set, in interface_recovery()'s row order --
+    # NOT boundary_idx[:n_interface], which counts DoFs in the directional modes
+    iface_idx = {sub.name: sub.interface_nodes() for sub in (sub_A, sub_B)}
     ids = {name: ctx["substructures"][name]["nnum"][idx]
            for name, idx in iface_idx.items()}
 
