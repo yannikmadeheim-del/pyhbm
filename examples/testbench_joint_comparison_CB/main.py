@@ -103,7 +103,7 @@ CONFIG = dict(
                                                       # | TangentPredictorTwo
                                                       # | TangentPredictorRobust
     step_adaptation = "ExponentialAdaptation",        # | BiExponentialAdaptation
-    solver_kwargs = {"maximum_iterations": 300, "absolute_tolerance": 1e-6},
+    solver_kwargs = {"maximum_iterations": 300},   # tolerance filled in below
     step_kwargs = {"base": 1.5, "initial_step_length": 0.1 * 2 * np.pi,
                    "maximum_step_length": 1.0 * 2 * np.pi,
                    "minimum_step_length": 1e-4,
@@ -112,6 +112,12 @@ CONFIG = dict(
                                    # continuation metric (no pyFBS equivalent)
     maximum_number_of_solutions = 10000, jacobian_update_frequency = 1,
 )
+
+# The corrector residual is a force, so a fixed absolute tolerance would mean a
+# different convergence quality at every excitation level. It is set here rather
+# than inside CONFIG because F0 is a keyword there, not yet a name. study.py
+# does the same per run, see its TOLERANCE_PER_F0.
+CONFIG["solver_kwargs"]["absolute_tolerance"] = 1e-6 * CONFIG["F0"]
 
 # --- output ---------------------------------------------------------------
 # Kept for schema symmetry with the pyFBS example. The shared
