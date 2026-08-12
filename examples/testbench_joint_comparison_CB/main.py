@@ -54,11 +54,16 @@ from pyhbm.numerical_continuation.predictor_step import TangentPredictorBordered
 
 HERE = Path(__file__).resolve().parent
 
-# FE data, workbook, npz caches and descriptor are the sibling cubic-spring
-# example's copy of the pyFBS lab_testbench data (see dynamical_system).
+# FE data and npz caches are the sibling cubic-spring example's copy of the
+# pyFBS lab_testbench data (see dynamical_system) -- 292 MB, shared.
 FEM_DIR = CB_DIR / "lab_testbench" / "FEM"
-XLSX_PATH = CB_DIR / "lab_testbench" / "Measurements" / "coupling_example.xlsx"
-DESCRIPTOR_PATH = CB_DIR / "substructure_descriptor.json"
+# The workbook and the descriptor are LOCAL to this example: its interface rows
+# are collocated (Channels_<X> and Impacts_<X> both hold the union of the two
+# sheets' Grouping==10 rows), so that RBE_rigid, RBE_average and the pyFBS VPT
+# all see the SAME interface DoF set and Tf == Tu.T. The cubic-spring and
+# dry-friction examples keep the as-measured sheets and are unaffected.
+XLSX_PATH = HERE / "coupling_example.xlsx"
+DESCRIPTOR_PATH = HERE / "substructure_descriptor.json"
 
 # ---------------------------------------------------------------------------
 # CONFIG -- system, then reduction, then solver. Plain JSON types only: the
