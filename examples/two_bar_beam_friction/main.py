@@ -3,11 +3,10 @@ Two bar+beam elements with frictional contact -- thesis case study 6.4.
 
 Traces the same forced-response branch TWICE, with two different solvers:
 
-    frf_2nd_order  FRFProblem + NumericalFRF on the 6 tip degrees of freedom,
-                   i.e. the second-order system solved through the admittance
-                   Y = Z^-1 of its linear part.
+    second_order   HarmonicBalanceMethod(second_order_ode=...) on the 6 tip
+                   degrees of freedom: M q'' + C q' + K q + f_nl = f_ext.
     first_order    HarmonicBalanceMethod(first_order_ode=...) on the 12-component
-                   state z = [q ; qdot] -- the original first-order solver.
+                   state z = [q ; qdot].
 
 They share nothing but the force law in dynamical_system.py, so agreement
 between the two branches is a real check. Each run writes one CSV into
@@ -32,8 +31,8 @@ except (AttributeError, ValueError):
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pyhbm import (ExponentialAdaptation, Fourier, FourierOmegaPoint, FRFProblem,
-                   HarmonicBalanceMethod, NumericalFRF, TangentPredictorOne,
+from pyhbm import (ExponentialAdaptation, Fourier, FourierOmegaPoint,
+                   HarmonicBalanceMethod, TangentPredictorOne,
                    save_solution_csv)
 # not re-exported by pyhbm/__init__.py -- imported from its defining module
 from pyhbm.numerical_continuation.corrector_step import ArcLengthParameterization
@@ -196,12 +195,11 @@ def run(solver, guess, dimension):
 # The two runs
 # ===========================================================================
 
-def solve_frf_2nd_order():
-    """Second-order system through its admittance Y = Z^-1 (FRFProblem)."""
+def solve_second_order():
+    """M q'' + C q' + K q + f_nl(q, q') = f_ext(tau) on the 6 tip DoFs."""
     system = BarBeamSecondOrder()
-    problem = FRFProblem(system, NumericalFRF(M_MATRIX, C_MATRIX, K_MATRIX))
     solver = HarmonicBalanceMethod(
-        harmonics=HARMONICS, freq_domain_ode=problem,
+        harmonics=HARMONICS, second_order_ode=system,
         corrector_parameterization=PARAMETERIZATION,
         predictor=PREDICTOR, step_length_adaptation=STEP_ADAPTATION)
 
@@ -233,10 +231,10 @@ def solve_first_order():
 
 
 RUNS = {
-    "frf_2nd_order": (solve_frf_2nd_order,
-                      "FRFProblem + NumericalFRF on the 6 tip DoFs"),
-    "first_order":   (solve_first_order,
-                      "original first-order solver on the 12-component state"),
+    "second_order": (solve_second_order,
+                     "second-order solver on the 6 tip DoFs"),
+    "first_order":  (solve_first_order,
+                     "first-order solver on the 12-component state"),
 }
 
 

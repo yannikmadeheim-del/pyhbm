@@ -27,7 +27,7 @@ from dynamical_system import (jacobian_nonlinear_force,
                               jacobian_nonlinear_force_qdot, nonlinear_force)
 
 RESULTS = Path(__file__).resolve().parent / "results"
-OURS = ("frf_2nd_order", "first_order")
+OURS = ("second_order", "first_order")
 
 failures = []
 
