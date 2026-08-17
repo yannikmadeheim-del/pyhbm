@@ -72,6 +72,7 @@ from .validation import (
 from .io import (
     plot_FRF,
     save_solution_set,
+    save_solution_csv,
 )
 
 from .stability import (
@@ -109,7 +110,7 @@ __all__ = [
     # core
     "SolutionSet", "HarmonicBalanceMethod",
     # IO / validation / stability
-    "plot_FRF", "save_solution_set",
+    "plot_FRF", "save_solution_set", "save_solution_csv",
     "TimeDomainValidator", "ValidationResult",
     "FloquetAnalyzer", "StabilityReport", "BifurcationDetector", "SpecialPoint",
 ]

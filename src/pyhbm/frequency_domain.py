@@ -256,6 +256,20 @@ class JacobianFourier(object):
         JacobianFourier.number_of_harmonics = len(JacobianFourier.harmonics)
         JacobianFourier.harmonic_truncation_order = max(JacobianFourier.harmonics)
 
+        # Selects the harmonic pairs (h_i, h_j) whose conjugate term contributes
+        # to the linear Jacobian, i.e. h_i + h_j = 0 -- EXCEPT the pair (0, 0).
+        # Harmonic 0 is its own conjugate, so counting it here would add the
+        # linear coefficient twice and make dR/dRe(Q_0) come out at 2A instead
+        # of A, while leaving the imaginary h = 0 block at A - A = 0, i.e. an
+        # all-zero row and column (harmonic 0 of a real signal has no imaginary
+        # part). Excluding it fixes both at once: the real block becomes exact
+        # and the imaginary one becomes A, which pins the unused imaginary
+        # coefficient at zero. Genuine pairs such as (1, -1) are unaffected.
+        JacobianFourier.conjugate_pair_mask = where(
+            (JacobianFourier.harmonics_state_conj == 0)
+            & ~((Fourier.harmonics[:, None] == 0) & (Fourier.harmonics == 0)),
+            1, 0)
+
     def __init__(self, RR: array, RI: array, IR: array, II: array) -> None:
         self.RR = RR # Derivative of real part wrt real part
         self.RI = RI # Derivative of real part wrt imag part
@@ -375,7 +389,7 @@ class FrequencyDomainFirstOrderODE_Real(FrequencyDomainFirstOrderODE):
     def compute_jacobian_linear_term(self) -> JacobianFourier_Real:
 
         state = kron(eye(Fourier.number_of_harmonics), self.ode.linear_coefficient)
-        state_conj = kron(where(JacobianFourier.harmonics_state_conj == 0, 1, 0), self.ode.linear_coefficient)
+        state_conj = kron(JacobianFourier.conjugate_pair_mask, self.ode.linear_coefficient)
 
         RR = state + state_conj
         II = state - state_conj
@@ -535,7 +549,7 @@ class FrequencyDomainSecondOrderODE_Real(FrequencyDomainSecondOrderODE):
                  + 1j * omega * self.kron_damping\
                  + self.kron_stiffness
 
-        state_conj = kron(where(JacobianFourier.harmonics_state_conj == 0, 1, 0), -omega**2*self.ode.mass_matrix + 1j*omega*self.ode.damping_matrix + self.ode.stiffness_matrix)
+        state_conj = kron(JacobianFourier.conjugate_pair_mask, -omega**2*self.ode.mass_matrix + 1j*omega*self.ode.damping_matrix + self.ode.stiffness_matrix)
 
         RR = (state + state_conj).real
         II = (state - state_conj).real

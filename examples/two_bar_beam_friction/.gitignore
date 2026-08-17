@@ -1,0 +1,5 @@
+# Solver output: one CSV per run, regenerable from main.py.
+# Copy them to pyFBS by hand, not through git.
+results/
+run.log
+__pycache__/
