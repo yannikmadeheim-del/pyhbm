@@ -21,3 +21,8 @@ linear_check.png
 
 # NFRC figure (regenerable by main.py)
 nfrc.png
+
+# CB reference sweeps written by main.py (reference_<method>_cb_hbm.csv).
+# ~280 MB of harmonic amplitudes -- past GitHub's file-size limit and
+# regenerable by rerunning main.py for each condensation.
+reference_*_cb_hbm.csv
