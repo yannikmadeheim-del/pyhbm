@@ -43,6 +43,7 @@ from dynamical_system import (CB_DIR, CoupledJointCB, ReducedSubstructure,
                               nearest_node, output_channel_label,
                               physical_recovery, read_channels, read_descriptor,
                               read_vpt_rows, save_physical_solution)
+from measurements import DEFAULT as DEFAULT_WORKBOOK, resolve as resolve_workbook
 
 from pyhbm import (BiExponentialAdaptation, ExponentialAdaptation,
                    FourierOmegaPoint, HarmonicBalanceMethod,
@@ -57,13 +58,17 @@ HERE = Path(__file__).resolve().parent
 # FE data and npz caches are the sibling cubic-spring example's copy of the
 # pyFBS lab_testbench data (see dynamical_system) -- 292 MB, shared.
 FEM_DIR = CB_DIR / "lab_testbench" / "FEM"
-# The workbook and the descriptor are LOCAL to this example: its interface rows
-# are collocated (Channels_<X> and Impacts_<X> both hold the union of the two
-# sheets' Grouping==10 rows), so that RBE_rigid, RBE_average and the pyFBS VPT
-# all see the SAME interface DoF set and Tf == Tu.T. The cubic-spring and
-# dry-friction examples keep the as-measured sheets and are unaffected.
-XLSX_PATH = HERE / "coupling_example.xlsx"
-DESCRIPTOR_PATH = HERE / "substructure_descriptor.json"
+# The workbooks and their descriptors are LOCAL to this example: the interface
+# rows are collocated, so RBE_rigid, RBE_average and the pyFBS VPT all see the
+# SAME interface DoF set. The two sheets list that set in a different row order,
+# so Tf equals Tu.T only up to that permutation, which both pipelines apply
+# consistently. Each workbook has its own descriptor, written by pyFBS's
+# export_substructure_descriptor.py. The cubic-spring and dry-friction examples
+# keep the as-measured sheets and are unaffected.
+
+
+def descriptor_path(workbook):
+    return HERE / f"substructure_descriptor_{workbook}.json"
 
 # ---------------------------------------------------------------------------
 # CONFIG -- system, then reduction, then solver. Plain JSON types only: the
@@ -86,6 +91,7 @@ CONFIG = dict(
                                    # what makes the parameter comparable across
                                    # the two pipelines
     solver = "pyhbm-cb",           # names the pipeline in mixed comparisons
+    workbook = DEFAULT_WORKBOOK,   # measurement table in measurements/
 
     # --- reduction (pyhbm-only) -------------------------------------------
     condensation = "RBE_average",  # whole-node boundary: "rbe2" (rigid MPC,
@@ -143,7 +149,7 @@ SOLVER_PARTS = {cls.__name__: cls for cls in (
 # Model build
 # ---------------------------------------------------------------------------
 
-def load_substructures():
+def load_substructures(workbook=DEFAULT_WORKBOOK):
     """
     Everything that depends on neither the joint nor the reduction settings: the
     Ansys import (npz-cached) of A and B, the pyFBS descriptor that defines the
@@ -154,7 +160,8 @@ def load_substructures():
         :func:`save_solution`.
     """
     print(f"FEM data: {FEM_DIR}")
-    descriptor = read_descriptor(DESCRIPTOR_PATH)
+    xlsx_path = resolve_workbook(workbook)
+    descriptor = read_descriptor(descriptor_path(workbook))
     substructures = {name: load_or_export(name, FEM_DIR, CB_DIR)
                      for name in ("A", "B")}
 
@@ -166,7 +173,7 @@ def load_substructures():
     drive_node_B = int(np.argmin(
         np.linalg.norm(substructures["B"]["nodes"] - inp_pos, axis=1)))
 
-    channels = {name: read_channels(XLSX_PATH, name) for name in ("A", "B")}
+    channels = {name: read_channels(xlsx_path, name) for name in ("A", "B")}
     chan_info = {name: channel_snap_info(substructures[name], channels[name])
                  for name in ("A", "B")}
     out_label = output_channel_label(channels["A"],
@@ -181,13 +188,14 @@ def load_substructures():
     out_dir = np.array(descriptor["output"]["direction"])
     out_node_A = int(np.argmin(
         np.linalg.norm(substructures["A"]["nodes"] - out_pos, axis=1)))
-    vpt_rows = {name: read_vpt_rows(XLSX_PATH, name, substructures[name]["nodes"])
+    vpt_rows = {name: read_vpt_rows(xlsx_path, name, substructures[name]["nodes"])
                 for name in ("A", "B")}
     for name in ("A", "B"):
         check_vpt_rows(vpt_rows[name], descriptor, name,
                        substructures[name]["nnum"])
 
     return dict(descriptor=descriptor, substructures=substructures,
+                xlsx_path=xlsx_path,
                 vp_xyz=np.array(descriptor["vp"]["position"]),
                 inp_pos=inp_pos, inp_dir=inp_dir, drive_node_B=drive_node_B,
                 channels=channels, chan_info=chan_info, out_label=out_label,
@@ -213,7 +221,7 @@ def build_reduced(cfg, ctx):
     """
     idx_A, idx_B = get_boundary_nodes(
         cfg["interface_method"], ctx["substructures"]["A"],
-        ctx["substructures"]["B"], xlsx_path=XLSX_PATH,
+        ctx["substructures"]["B"], xlsx_path=ctx["xlsx_path"],
         descriptor=ctx["descriptor"])
 
     if cfg["condensation"] in ("RBE_rigid", "RBE_average"):
@@ -404,7 +412,7 @@ if __name__ == "__main__":
 
     print(f"Continuation window: {CONFIG['f_lo']:.1f}..{CONFIG['f_hi']:.1f} Hz"
           f" ({CONFIG['sweep']}ward sweep)")
-    context = load_substructures()
+    context = load_substructures(CONFIG["workbook"])
 
     print(f"\n=== condensation: {CONFIG['condensation'].upper()} ===")
     reduction = build_reduced(CONFIG, context)

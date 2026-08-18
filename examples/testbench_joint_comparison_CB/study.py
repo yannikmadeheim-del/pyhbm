@@ -209,7 +209,7 @@ def main():
     for entry in runs:
         groups.setdefault(group_key(entry[1]), []).append(entry)
 
-    context = run.load_substructures()
+    context = run.load_substructures(run.CONFIG["workbook"])
 
     done = 0
     for group in groups.values():
