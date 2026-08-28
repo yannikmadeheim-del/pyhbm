@@ -91,7 +91,7 @@ CONFIG = dict(
                                    # what makes the parameter comparable across
                                    # the two pipelines
     solver = "pyhbm-cb",           # names the pipeline in mixed comparisons
-    workbook = DEFAULT_WORKBOOK,   # measurement table in measurements/
+    workbook = "collocated_impact_locations",   # table in measurements/
 
     # --- reduction (pyhbm-only) -------------------------------------------
     condensation = "RBE_average",  # whole-node boundary: "rbe2" (rigid MPC,
@@ -136,7 +136,9 @@ CONFIG["solver_kwargs"]["absolute_tolerance"] = 1e-6 * CONFIG["F0"]
 # used unchanged rather than forked, so this flag does not currently shrink the
 # export.
 SAVE_FULL_RESPONSE = True
-RESULT_NAME = None          # None -> auto-generated from the config
+RESULT_NAME = "linear+cubic_RBE_average_impactloc.csv"   # None -> auto-generated
+                            # from the config; the auto name carries the joint and
+                            # the condensation but NOT the workbook
 
 # solver parts addressable by name from CONFIG (and hence from a CSV header)
 SOLVER_PARTS = {cls.__name__: cls for cls in (
