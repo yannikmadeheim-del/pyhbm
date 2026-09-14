@@ -4,12 +4,10 @@ Throwaway verification for the two_bar_beam_friction example -- DELETE ANYTIME.
 Nothing imports this file; dynamical_system.py and main.py do not depend on it
 and stay assert-free. It checks, in order:
 
-  1. AFT sampling      N_t matches the pyFBS example's sample_number
+  1. AFT sampling      N_t next to the pyFBS example's sample_number
   2. Force laws        finite-difference check of both analytical Jacobians
-  3. Statics           the two relations Ke itself enforces, and what the
-                       thesis reports against them
-  4. Branches          the two solver formulations against each other
-  5. pyFBS             any pyFBS CSV dropped into results/, against ours
+  3. Branches          the two solver formulations against each other
+  4. pyFBS             any pyFBS CSV dropped into results/, against ours
 
 Run after main.py:
 
@@ -47,8 +45,8 @@ section("1. AFT sampling")
 
 h_max = 15
 n_t = (ds.POLYNOMIAL_DEGREE + 1) * h_max + 1
-check("N_t == 256 (pyFBS sample_number)", n_t == 256,
-      f"polynomial_degree={ds.POLYNOMIAL_DEGREE}, h_max={h_max} -> N_t={n_t}")
+print(f"  polynomial_degree={ds.POLYNOMIAL_DEGREE}, h_max={h_max} -> N_t={n_t}"
+      f"  (pyFBS sample_number: 512)")
 
 
 # ------------------------------------------------------------- 2. force laws
@@ -83,50 +81,8 @@ for scale, regime in ((2e-3, "partial slip (tanh unsaturated)"),
         check(f"{name} -- {regime}", error < 1e-5, f"rel. error {error:.2e}")
 
 
-# ---------------------------------------------------------------- 3. statics
-section("3. Statics -- what Ke enforces, and what the thesis reports")
-
-Kb = ds.K_MATRIX[1:3, 1:3]                       # bending block of one element
-x_N, N = ds.static_contact_state()
-q2 = N - ds.P5
-q3 = 1.5 * q2
-
-print(f"  bending block of Ke: {Kb.tolist()}")
-print(f"  our static state: N = {N:.7f}, x_N = {x_N:.7f},"
-      f" q2 = {q2:.7e}, q3 = {q3:.7e}, q5 = {-q2:.7e}")
-
-# neither f_ext nor f_nl has a moment component, so the slope row must vanish
-check("slope row of Ke closes: -6EI/l^2 q2 + 4EI/l q3 == 0",
-      abs((Kb @ [q2, q3])[1]) < 1e-14, f"residual moment {(Kb @ [q2, q3])[1]:.2e}")
-# and the transverse row must reproduce the equilibrium q2 = N - P5
-check("transverse row closes: 4 q2 - 2 q3 - N == -P5",
-      abs((Kb @ [q2, q3])[0] - N + ds.P5) < 1e-12)
-check("x_N agrees with pyFBS's AFT penetration 0.0101848",
-      abs(x_N - 0.0101848) < 1e-6, f"x_N = {x_N:.7f}")
-
-print("\n  thesis-reported static values, tested against the SAME Ke:")
-t_q2, t_q3, t_q5, t_q6 = (-6.020127e-3, -6.653825e-3, 4.119034e-3, -2.851639e-3)
-print(f"    q3/q2 = {t_q3 / t_q2:.4f} and q6/q5 = {t_q6 / t_q5:.4f}   (Ke forces 1.5)")
-print(f"    q5 = {t_q5:.6e} vs -q2 = {-t_q2:.6e}   (Ke forces q5 = -q2)")
-print(f"    residual moment left by Ke: element 1 {(Kb @ [t_q2, t_q3])[1]:+.4e},"
-      f" element 2 {(Kb @ [t_q5, t_q6])[1]:+.4e}   (must be 0)")
-print("    -> the four individual values are NOT reproducible from the thesis'"
-      " own Ke.")
-
-# ... but their DIFFERENCE is sound: it reproduces the reported contact state
-q_perp = ds.EPS + t_q2 - t_q5
-N_thesis, slope_thesis = ds.normal_force(np.array([-q_perp + ds.EPS]))
-print("\n  their difference q2 - q5, however, is self-consistent:")
-check("q_perp from their q2,q5 == their penetration -1.3916133e-4",
-      abs(q_perp + 1.3916133e-4) < 1e-9, f"q_perp = {q_perp:.7e}")
-check("eq. (6.15) on it == their N = 0.3825733",
-      abs(N_thesis[0] - 0.3825733) < 1e-6, f"N = {N_thesis[0]:.7f}")
-check("d f_nl_2/d q2 == their 267.367",
-      abs(slope_thesis[0] - 267.367) < 1e-2, f"{slope_thesis[0]:.3f}")
-
-
-# --------------------------------------------------------------- 4. branches
-section("4. Solver formulations against each other")
+# --------------------------------------------------------------- 3. branches
+section("3. Solver formulations against each other")
 
 
 def read(path):
@@ -183,8 +139,8 @@ else:
     check("results/ contains at least one branch", False)
 
 
-# ------------------------------------------------------------------ 5. pyFBS
-section("5. pyFBS CSVs dropped into results/ (optional)")
+# ------------------------------------------------------------------ 4. pyFBS
+section("4. pyFBS CSVs dropped into results/ (optional)")
 
 foreign = sorted(p for p in RESULTS.glob("*.csv")
                  if p.stem not in OURS)

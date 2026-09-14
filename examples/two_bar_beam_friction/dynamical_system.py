@@ -24,7 +24,14 @@ Equations, quoted from the thesis (section 6.4):
           so  f_nl_2 = -N = -ln(exp(k alpha2 [q5 - q2 - eps]) + 1)/alpha2
           friction   f_nl_1 = -mu f_nl_2 tanh(alpha1 [q1dot - q4dot])
           action-reaction    f_nl = [f_nl_1, f_nl_2, 0, -f_nl_1, -f_nl_2, 0]^T
-          excitation         f_ext = [P1 cos(w t), -P5, 0, 0, P5, 0]^T
+
+Deviation from the thesis, shared with the pyFBS two_bar_beam_friction example:
+with only the STATIC clamping force P5 the normal contact is statically
+determinate -- N comes out exactly constant. A transverse harmonic force P2 on
+q2 is therefore added on top of a smaller clamping force, which drives the
+normal coordinate directly and modulates the contact within every period:
+
+          excitation         f_ext = [P1 cos(w t), -P2 sin(w t) - P5, 0, 0, P5, 0]^T
 
 Damping is Rayleigh, C = beta K, chosen so that it is roughly 5% of the
 restitution force near the first resonance, which the thesis places at w = 1.
@@ -46,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import numpy as np
-from numpy import zeros, cos, tanh, exp, log1p
+from numpy import zeros, cos, sin, tanh, exp, log1p
 from scipy.special import expit
 
 from pyhbm.dynamical_system import FirstOrderODE, SecondOrderODE
@@ -68,10 +75,13 @@ ALPHA1 = 150.0      # friction regularization (slope at the stick condition)
 MU     = 0.1        # kinetic friction coefficient
 
 P1     = 0.1        # amplitude of the axial harmonic excitation on q1
-P5     = 0.4        # static clamping force
+P2     = 0.1        # amplitude of the transverse harmonic excitation on q2
+P5     = 0.02       # static clamping force
 BETA   = 0.05       # Rayleigh damping, C = BETA * K
 
-POLYNOMIAL_DEGREE = 16   # AFT sampling: N_t = (deg+1)*max(harmonic) + 1
+# AFT sampling: N_t = (deg+1)*max(harmonic) + 1 = 511 for H = 15, the closest
+# match to the pyFBS example's sample_number = 512
+POLYNOMIAL_DEGREE = 33
 
 
 # degree-of-freedom order of the assembled 6-DOF system (figure 6.13)
@@ -201,47 +211,19 @@ def jacobian_nonlinear_force_qdot(q, qdot):
 
 
 def external_force(adimensional_time):
-    """f_ext = [P1 cos(tau), -P5, 0, 0, P5, 0]^T.   -> (N_t, 6, 1)
+    """f_ext = [P1 cos(tau), -P2 sin(tau) - P5, 0, 0, P5, 0]^T.   -> (N_t, 6, 1)
 
-    The clamping force is static, so this has a non-zero mean: harmonic 0 MUST
-    be in the harmonic set or the preload is silently dropped.
+    P1 drives the tangential (sliding) coordinate through q1. On the normal
+    coordinate x_N = q5 - q2, the static clamping force P5 presses the tips
+    together and the harmonic force P2 on q2 modulates the contact. The
+    clamping force gives f_ext a non-zero mean: harmonic 0 MUST be in the
+    harmonic set or the preload is silently dropped.
     """
     f = zeros((len(adimensional_time), 6, 1))
-    f[:, Q1, 0] = P1 * cos(adimensional_time)
-    f[:, Q2, 0] = -P5
-    f[:, Q5, 0] = +P5
+    f[:, Q1, 0] = P1 * cos(adimensional_time)          # axial -> tangential sliding
+    f[:, Q2, 0] = -P2 * sin(adimensional_time) - P5    # transverse drive + clamping
+    f[:, Q5, 0] = +P5                                  # clamping
     return f
-
-
-def static_contact_state():
-    """
-    The static (harmonic-0) contact state under the clamping force alone, used
-    to seed the continuation.
-
-    Bending and axial dynamics are uncoupled and the clamping force is
-    constant, so the normal contact is essentially static. Neither f_ext nor
-    f_nl has a moment component, so the slope row of Ke gives q3 = 1.5 q2, and
-    the transverse row then reduces to q2 = N - P5. The two elements are
-    identical under exactly opposite loads, hence q5 = -q2 and
-
-        x_N = q5 - q2 = 2 (P5 - N),
-
-    which is 2 * (tip compliance l^3/3EI) * (P5 - N) with the thesis values.
-    Closing this with (6.15) leaves one scalar equation, solved by bisection:
-    N_law(x_N(N)) - N is strictly decreasing in N.
-
-    :returns: (x_N, N)
-    """
-    def gap_of(N):
-        return 2.0 * (L**3 / (3.0 * EI)) * (P5 - N)
-
-    lo, hi = 0.0, 2.0 * P5
-    for _ in range(200):
-        mid = 0.5 * (lo + hi)
-        N_law, _ = normal_force(np.array([gap_of(mid)]))
-        lo, hi = (mid, hi) if N_law[0] > mid else (lo, mid)
-    N = 0.5 * (lo + hi)
-    return gap_of(N), N
 
 
 # ===========================================================================

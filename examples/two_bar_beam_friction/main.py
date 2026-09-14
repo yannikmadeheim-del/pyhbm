@@ -14,9 +14,10 @@ results/, laid out exactly like the pyFBS two_bar_beam_friction example's, so a
 file can be copied over there by hand and plotted next to its curves.
 
 Model parameters live at the top of dynamical_system.py, solver settings at the
-top of this file. Run with:
+top of this file. Run both formulations, or name the ones to run:
 
     python examples/two_bar_beam_friction/main.py
+    python examples/two_bar_beam_friction/main.py first_order
 """
 import sys
 from pathlib import Path
@@ -34,6 +35,7 @@ import matplotlib.pyplot as plt
 from pyhbm import (ExponentialAdaptation, Fourier, FourierOmegaPoint,
                    HarmonicBalanceMethod, TangentPredictorOne,
                    save_solution_csv)
+from pyhbm.frequency_domain import Fourier_Real
 # not re-exported by pyhbm/__init__.py -- imported from its defining module
 from pyhbm.numerical_continuation.corrector_step import ArcLengthParameterization
 
@@ -47,8 +49,7 @@ from dynamical_system import (BarBeamFirstOrder, BarBeamSecondOrder, B_COUPLING,
 # Solver settings. Edit here.
 # ===========================================================================
 
-# harmonic 0 is MANDATORY: the clamping force P5 is static. The thesis reports
-# that H = 15 is already very close to its H = 70 reference.
+# harmonic 0 is MANDATORY: the clamping force P5 is static. The thesis reports that H = 15 is already very close to its H = 70 reference.
 HARMONICS = list(range(0, 16))
 
 OMEGA_START, OMEGA_END = 0.85, 1.09     # thesis continuation window
@@ -89,39 +90,40 @@ OMEGA_FIRST = OMEGA_START if SWEEP == "up" else OMEGA_END
 DIRECTION = +1.0 if SWEEP == "up" else -1.0
 
 
-def linear_response(omega):
-    """Linear (open-contact) response amplitude a_1 to the axial excitation."""
-    Z = -omega**2 * M_MATRIX + 1j * omega * C_MATRIX + K_MATRIX
-    f = np.zeros((DIMENSION, 1), complex)
-    f[ds.Q1, 0] = ds.P1
-    return np.linalg.solve(Z, f)[:, 0]
-
-
-def initial_guess(dimension, lift):
+def initial_guess(first_order):
     """
-    Cold start: the static contact state in harmonic 0 and the linear axial
-    response in harmonic 1.
+    Cold start from the contact-free linear response, clipped at the gap.
 
-    Without the static seed the first Newton solve starts fully separated and
-    has to find the preload from scratch. pyhbm's rFFT convention is
-    c_0 = N_t a_0 and c_h = N_t/2 a_h for h > 0.
+    The free response Q_h = Z(h w)^-1 F_h to the full excitation (static
+    clamping and harmonic drive) runs several gaps deep, so neither it nor the
+    zero-amplitude start is close enough for the first Newton solve. Clipping
+    the free motion at x_N = eps is the rigid-contact kinematic estimate -- the
+    free motion wherever the tips are apart, the gap wherever they would
+    interpenetrate -- and is the same cold start the pyFBS example uses on its
+    interface coordinates. The two tips are identical, so they share the
+    removed penetration equally.
 
-    :param lift: maps a 6-component displacement amplitude onto the solver's
-        coordinates (identity for q, [q ; 1j w q] for the first-order state).
+    :param first_order: True -> the first-order state z = [q ; qdot], whose
+        velocity harmonics are qdot_h = 1j h omega q_h.
     """
-    _, N = ds.static_contact_state()
-    q_static = np.zeros(DIMENSION)
-    q_static[ds.Q2] = N - ds.P5              # see static_contact_state
-    q_static[ds.Q3] = 1.5 * q_static[ds.Q2]
-    q_static[ds.Q5] = -q_static[ds.Q2]
-    q_static[ds.Q6] = -q_static[ds.Q3]
+    F = Fourier_Real.new_from_time_series(
+        ds.external_force(Fourier.adimensional_time_samples)).coefficients
+    Q = np.zeros((len(HARMONICS), DIMENSION, 1), complex)
+    for k, h in enumerate(HARMONICS):
+        Z = (-(h * OMEGA_FIRST)**2 * M_MATRIX + 1j * h * OMEGA_FIRST * C_MATRIX
+             + K_MATRIX)
+        Q[k] = np.linalg.solve(Z, F[k])
+    q = Fourier_Real(Q).compute_time_series()                  # (N_t, 6, 1)
 
-    guess = FourierOmegaPoint.zero_amplitude(dimension=dimension, omega=OMEGA_FIRST)
-    h0, h1 = HARMONICS.index(0), HARMONICS.index(1)
-    guess.fourier.coefficients[h0, :, 0] = N_TIME_SAMPLES * lift(q_static, 0.0)
-    guess.fourier.coefficients[h1, :, 0] = (N_TIME_SAMPLES / 2) * lift(
-        linear_response(OMEGA_FIRST), OMEGA_FIRST)
-    return guess
+    excess = np.maximum(q[:, ds.Q5, 0] - q[:, ds.Q2, 0] - ds.EPS, 0.0)
+    q[:, ds.Q2, 0] += 0.5 * excess
+    q[:, ds.Q5, 0] -= 0.5 * excess
+    Q = Fourier_Real.new_from_time_series(q).coefficients
+
+    if first_order:
+        h = np.asarray(HARMONICS)[:, None, None]
+        Q = np.concatenate([Q, 1j * h * OMEGA_FIRST * Q], axis=1)
+    return FourierOmegaPoint(Fourier(Q), OMEGA_FIRST)
 
 
 def header_lines(formulation, description, solve_time, n_points):
@@ -143,8 +145,10 @@ def header_lines(formulation, description, solve_time, n_points):
         "tangential (regularized dry friction):",
         f"  f_T = mu * N * tanh(alpha1 * d/dt x_T), mu={ds.MU}, alpha1={ds.ALPHA1}",
         "  f_nl = [f_T, -N, 0, -f_T, N, 0]^T",
-        f"excitation: f_ext = [P1 cos(omega t), -P5, 0, 0, P5, 0]^T,"
-        f" P1={ds.P1} (axial, harmonic), P5={ds.P5} (clamping, static)",
+        f"excitation: f_ext = [P1 cos(omega t), -P2 sin(omega t) - P5, 0, 0, P5, 0]^T,"
+        f" P1={ds.P1} (axial -> tangential sliding),"
+        f" P2={ds.P2} (transverse drive -> normal contact),"
+        f" P5={ds.P5} (clamping, static)",
         "",
         f"harmonics: {HARMONICS}  (harmonic 0 carries the static clamping preload)",
         f"AFT sampling: polynomial_degree = {POLYNOMIAL_DEGREE} -> N_t = {N_TIME_SAMPLES}",
@@ -203,7 +207,7 @@ def solve_second_order():
         corrector_parameterization=PARAMETERIZATION,
         predictor=PREDICTOR, step_length_adaptation=STEP_ADAPTATION)
 
-    guess = initial_guess(DIMENSION, lift=lambda q, w: q)
+    guess = initial_guess(first_order=False)
     solution_set, solve_time = run(solver, guess, DIMENSION)
 
     # solver coordinates are q itself; prepend the interface coordinates x_rel = B q
@@ -219,8 +223,7 @@ def solve_first_order():
         corrector_parameterization=PARAMETERIZATION,
         predictor=PREDICTOR, step_length_adaptation=STEP_ADAPTATION)
 
-    guess = initial_guess(system.dimension,
-                          lift=lambda q, w: np.concatenate([q, 1j * w * q]))
+    guess = initial_guess(first_order=True)
     solution_set, solve_time = run(solver, guess, system.dimension)
 
     # the state carries qdot too; export only [x_rel ; q], as the other run does
@@ -246,7 +249,8 @@ if __name__ == "__main__":
           f" ({SWEEP}ward sweep)\n")
 
     curves = {}
-    for name, (solve, description) in RUNS.items():
+    for name in sys.argv[1:] or list(RUNS):
+        solve, description = RUNS[name]
         print(f"=== {name} ===")
         try:
             solution_set, solve_time, recovery = solve()

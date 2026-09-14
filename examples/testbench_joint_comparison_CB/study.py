@@ -37,6 +37,8 @@ import time
 import traceback
 from pathlib import Path
 
+from openpyxl.workbook import workbook
+
 try:                                    # live, UTF-8 progress prints on Windows
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 except (AttributeError, ValueError):
@@ -54,12 +56,13 @@ BASE = dict(
     F0 = 200.0, modal_damping = 0.005,
     solver = "pyhbm-cb",
     condensation = "RBE_average",
-    n_modes = 60,                  # fixed-interface modes per substructure; 20
+    n_modes = 30,                  # fixed-interface modes per substructure; 20
                                    # tops the basis out at ~7 kHz, below the
                                    # 5th harmonic of the 2 kHz sweep end
+    workbook= "collocated_sensor_coupling_example",
     interface_method = "descriptor", rbe3_weights = None,
     harmonics = [1, 3, 5], polynomial_degree = 3,
-    f_lo = 1.0, f_hi = 2000.0, sweep = "down",
+    f_lo = 1.0, f_hi = 1000.0, sweep = "down",
     parameterization = "ArcLengthParameterization",
     predictor = "TangentPredictorBordered",
     step_adaptation = "ExponentialAdaptation",
@@ -86,7 +89,7 @@ JOINT_SETS = [
     # identical linear backbone in every run; alpha = 0 is the linear reference,
     # so all curves share one element list and stay comparable in the legend
     [dict(type="linear", k=1.0e6, c=0.5, dofs=ALL6),
-     dict(type="cubic",  alpha=[0.0, 1.0e8, 1.0e9], dofs=ALL6)],
+     dict(type="cubic",  alpha=[1.0e8], dofs=ALL6)],
 ]
 
 # Amplitude crossed with the interface condensation: 3 alphas x 3 F0 x 2
@@ -95,7 +98,7 @@ JOINT_SETS = [
 # The directional condensations take their boundary from the workbook VPT rows
 # and therefore IGNORE ``interface_method`` and ``rbe3_weights``: sweeping
 # either of those alongside them only produces duplicate runs.
-GLOBAL_SWEEP = dict(F0=[50.0, 200.0, 800.0],
+GLOBAL_SWEEP = dict(F0=[80],
                     condensation=["RBE_average", "RBE_rigid"])
 # ---------------------------------------------------------------------------
 
